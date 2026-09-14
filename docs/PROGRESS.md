@@ -8,7 +8,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 0 | Docs thiết kế (00–15) | ✅ Hoàn tất |
 | 1 | Skeleton + DB + auth + dashboard | ✅ Hoàn tất (commit `7aedf8c`) |
 | 2 | Movie research → opportunity → angle | ✅ Hoàn tất (commit `85d7c4d`) |
-| 3 | Script → voice → timestamps | 🚧 Đang triển khai (xem bên dưới) |
+| 3 | Script → voice → timestamps | ✅ Hoàn tất (commit `ce7b366`) |
 | 4 | Visual plan → assets → copyright gate | ⬜ Chưa bắt đầu |
 | 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
 | 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
