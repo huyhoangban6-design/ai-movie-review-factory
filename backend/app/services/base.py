@@ -2,12 +2,26 @@ from typing import Protocol
 
 from app.schemas.research import AnglesOutput, MovieResearchOutput, OpportunityScoreOutput
 from app.schemas.scripting import ScriptOutput, TimelineOutput, VoiceOutput
+from app.schemas.visual import (
+    AssetCreate,
+    CopyrightReviewInput,
+    CopyrightReviewOutput,
+    VisualPlanMetadata,
+)
 
 
 class SentenceLike(Protocol):
     sentence: str
     start_s: float
     end_s: float
+
+
+class AssetLike(Protocol):
+    source: str | None
+    commercial_use: str | None
+    duration_s: float | None
+    license: str | None
+    transformations: list | None
 
 
 class ResearchProvider(Protocol):
@@ -56,3 +70,26 @@ class TimelineProvider(Protocol):
     name: str = "offline"
 
     def build(self, full_text: str, segments: list[str], sentences: list[SentenceLike]) -> TimelineOutput: ...
+
+
+class VisualPlannerProvider(Protocol):
+    name: str = "offline"
+
+    def plan(self, segments: list[object]) -> VisualPlanMetadata: ...
+
+
+class AssetProvider(Protocol):
+    name: str = "offline"
+
+    def acquire(
+        self,
+        visual_plan: VisualPlanMetadata,
+        segment_index: int | None,
+        source_hint: str,
+    ) -> list[AssetCreate]: ...
+
+
+class CopyrightProvider(Protocol):
+    name: str = "offline"
+
+    def evaluate(self, asset: AssetLike) -> CopyrightReviewOutput: ...

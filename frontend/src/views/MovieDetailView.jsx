@@ -11,7 +11,7 @@ export default function MovieDetailView() {
   const [scriptDetail, setScriptDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false })
+  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false, visualPlan: false, assets: false, copyright: false })
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +91,42 @@ export default function MovieDetailView() {
     finally { setBusy(b => ({ ...b, timeline: false })) }
   }
 
+  async function onVisualPlan() {
+    if (!scriptDetail) return
+    setBusy(b => ({ ...b, visualPlan: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/visual/plan', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, visualPlan: false })) }
+  }
+
+  async function onAssets() {
+    if (!scriptDetail?.visual_plan) return
+    setBusy(b => ({ ...b, assets: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/assets/generate', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, assets: false })) }
+  }
+
+  async function onCopyright() {
+    if (!scriptDetail?.assets?.length) return
+    setBusy(b => ({ ...b, copyright: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/copyright/evaluate', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, copyright: false })) }
+  }
+
   if (loading) return <div className='muted'>Đang tải…</div>
   if (!movie) return <div className='error-banner'>{error || 'Không tìm thấy phim'}</div>
 
@@ -127,8 +163,17 @@ export default function MovieDetailView() {
           <button className='btn btn-primary' disabled={busy.voice || !scriptDetail} onClick={onVoice}>
             {busy.voice ? 'Đang tạo giọng…' : scriptDetail?.latest_generation ? 'Tạo giọng đọc lại' : 'Tạo giọng đọc'}
           </button>
-          <button className='btn btn-primary' disabled={busy.timeline || !scriptDetail?.latest_generation} onClick={onTimeline}>
+          <<button className='btn btn-primary' disabled={busy.timeline || !scriptDetail?.latest_generation} onClick={onTimeline}>
             {busy.timeline ? 'Đang dựng…' : scriptDetail?.timeline ? 'Dựng timeline lại' : 'Dựng timeline'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.visualPlan || !scriptDetail} onClick={onVisualPlan}>
+            {busy.visualPlan ? 'Đang phân plan…' : scriptDetail?.visual_plan ? 'Phân plan lại' : 'Phân plan hình ảnh'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.assets || !scriptDetail?.visual_plan} onClick={onAssets}>
+            {busy.assets ? 'Đang tìm hình…' : scriptDetail?.assets?.length ? 'Tạo hình lại' : 'Tạo hình ảnh'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.copyright || !scriptDetail?.assets?.length} onClick={onCopyright}>
+            {busy.copyright ? 'Đang kiểm bản quyền…' : scriptDetail?.copyright_reviews?.length ? 'Kiểm lại bản quyền' : 'Kiểm bản quyền'}
           </button>
         </div>
         {error && <div className='error-banner' style={{ marginTop: '0.5rem' }}>{error}</div>}
@@ -218,6 +263,55 @@ export default function MovieDetailView() {
                     <span className='strong'>{SCRIPT_SECTION_LABEL[ts.section] || ts.section}</span>
                     <span className='muted small' style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                       {formatDuration(ts.start_s)} → {formatDuration(ts.end_s)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.visual_plan && (
+            <div className='visual-plan-info'>
+              <h3>Visual plan <span className='muted small'>v{scriptDetail.visual_plan.strategy_version} · {formatDuration(scriptDetail.visual_plan.total_planned_duration_s)}</span></h3>
+              <ul className='timeline-list'>
+                {scriptDetail.visual_plan.segments?.map((vp) => (
+                  <li key={vp.segment_index} className='timeline-item'>
+                    <span className='badge badge-small'>{vp.segment_index + 1}</span>
+                    <span className='strong'>{SCRIPT_SECTION_LABEL[vp.section] || vp.section}</span>
+                    <span className='muted small' style={{ marginLeft: 'auto' }}>{vp.purpose} · {formatDuration(vp.duration_s)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.assets?.length > 0 && (
+            <div className='assets-info'>
+              <h3>Hình ảnh ({scriptDetail.assets.length})</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.assets.map((asset) => (
+                  <li key={asset.id} className='timeline-item'>
+                    <span className='badge badge-small'>{asset.segment_index + 1}</span>
+                    <span className='strong'>{asset.asset_type}</span>
+                    <span className='muted small' style={{ marginLeft: 'auto' }}>
+                      {asset.source} · {asset.license || 'thiếu'} · {asset.commercial_use || 'unknown'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.copyright_reviews?.length > 0 && (
+            <div className='copyright-info'>
+              <h3>Đánh giá bản quyền</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.copyright_reviews.map((rev) => (
+                  <li key={rev.asset_id} className='timeline-item'>
+                    <span className='badge badge-small'>#{rev.asset_id}</span>
+                    <span className={`strong ${rev.decision === 'block' ? 'error-banner' : ''}`}>{rev.decision}</span>
+                    <span className='muted small' style={{ marginLeft: 'auto' }}>
+                      {rev.risk_level} {rev.duration_warning ? '· clip > 3s' : ''} {rev.human_review_required ? '· cần review' : ''}
                     </span>
                   </li>
                 ))}

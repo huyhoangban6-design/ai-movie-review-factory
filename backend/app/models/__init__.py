@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.assets import Asset, AssetSource, CopyrightReview, RiskLevel
 from app.models.job import Job
 from app.models.media_source import MediaSource
 from app.models.movie import (
@@ -25,11 +26,14 @@ from app.models.scripting import (
 from app.models.user import User
 
 __all__ = [
+    "Asset",
+    "AssetSource",
     "Base",
     "CommercialUse",
     "Competitor",
     "CompetitorVideo",
     "ContentAngle",
+    "CopyrightReview",
     "Job",
     "MediaSource",
     "Movie",
@@ -37,6 +41,7 @@ __all__ = [
     "MovieSource",
     "Opportunity",
     "Project",
+    "RiskLevel",
     "Script",
     "ScriptSegment",
     "ScriptStatus",

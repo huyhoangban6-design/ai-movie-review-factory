@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.research import Angle
+from app.schemas.visual import AssetOut, CopyrightReviewOutput, VisualPlanMetadata
 
 
 # ---------- script section structure (docs/05: Script Agent) ----------
@@ -151,3 +152,7 @@ class ScriptDetailOut(BaseModel):
     segments: list[SegmentDetailOut] = Field(default_factory=list)
     latest_generation: Optional[GenerationOut] = None
     timeline: Optional[TimelineOut] = None
+    pipeline_status: str = "script"
+    visual_plan: Optional[VisualPlanMetadata] = None
+    assets: list[AssetOut] = Field(default_factory=list)
+    copyright_reviews: list[CopyrightReviewOutput] = Field(default_factory=list)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.models.assets import Asset, CopyrightReview
 from app.models.job import Job, JobType
 from app.models.movie import ContentAngle, Movie
 from app.models.scripting import Script, ScriptSegment, ScriptTimeline, VoiceGeneration
@@ -16,6 +17,12 @@ from app.schemas.scripting import (
     ScriptDetailOut,
     SegmentDetailOut,
     TimelineOut,
+)
+from app.schemas.visual import (
+    AssetOut,
+    CopyrightReviewOutput,
+    VisualPlanMetadata,
+    VisualPlanSegment,
 )
 from app.services.factory import get_script_provider
 from app.services.jobs import create_job, mark_job_failed, mark_job_success
@@ -140,6 +147,27 @@ def get_script_detail(
         .where(ScriptTimeline.script_id == script.id)
         .order_by(ScriptTimeline.id.desc())
     )
+    assets = list(
+        db.scalars(select(Asset).where(Asset.script_id == script.id).order_by(Asset.segment_index))
+    )
+    asset_ids = [a.id for a in assets]
+    reviews = (
+        list(db.scalars(select(CopyrightReview).where(CopyrightReview.asset_id.in_(asset_ids))))
+        if asset_ids
+        else []
+    )
+    review_map: dict[int, CopyrightReview] = {r.asset_id: r for r in reviews}
+
+    if script.visual_plan:
+        visual_plan = VisualPlanMetadata(
+            strategy_version="v1",
+            total_planned_duration_s=round(
+                sum(float(p.get("duration_s", 0)) for p in script.visual_plan), 2
+            ),
+            segments=[VisualPlanSegment(**p) for p in script.visual_plan],
+        )
+    else:
+        visual_plan = None
 
     return ScriptDetailOut(
         id=script.id,
@@ -158,4 +186,19 @@ def get_script_detail(
             else None
         ),
         timeline=TimelineOut.model_validate(timeline, from_attributes=True) if timeline else None,
+        pipeline_status=script.pipeline_status,
+        visual_plan=visual_plan,
+        assets=[AssetOut.model_validate(a, from_attributes=True) for a in assets],
+        copyright_reviews=[
+            CopyrightReviewOutput(
+                asset_id=r.asset_id,
+                risk_level=r.risk_level.value,
+                duration_warning=r.duration_warning,
+                human_review_required=r.human_review_required,
+                policy_notes=r.policy_notes or [],
+                decision=r.decision,
+                notes=r.notes,
+            )
+            for r in reviews
+        ],
     )

@@ -65,10 +65,17 @@ cd frontend && npm test                                  # frontend (vitest)
 
 ## API (Phase 3 — kịch bản, giọng đọc, timestamps)
 - `POST /api/v1/scripts/generate` — viết kịch bản (HOOK→THESIS→…→CTA, CP2), version mỗi lần chạy
-- `GET  /api/v1/scripts/{id}` — chi tiết script: segments, voice mới nhất, timeline
+- `GET  /api/v1/scripts/{id}` — chi tiết script: segments, voice mới nhất, timeline, visual plan, assets, copyright reviews
 - `POST /api/v1/voice/generate` — TTS theo voice profile (license gate thương mại); tự tạo profile mặc định
 - `POST /api/v1/timeline/build` — căn từng segment theo timestamps của voice (chuẩn bị cho Visual Planner Phase 4)
 - Provider thật (TTS) cắm qua `.env`: `SCRIPT_PROVIDER`/`VOICE_PROVIDER`/`TIMELINE_PROVIDER` + keys
+
+## API (Phase 4 — visual plan, assets, copyright gate)
+- `POST /api/v1/visual/plan` — sinh visual plan (9 segments, deterministic planner) từ script segments
+- `POST /api/v1/assets/generate` — tạo asset placeholder (CC0 hoặc theo source hint) cho mọi segment
+- `POST /api/v1/assets/search` — tương tự generate nhưng dùng source hint `licensed_stock`
+- `POST /api/v1/copyright/evaluate` — đánh giá bản quyền: 3-second rule, commercial_use gate, risk scoring
+- Provider cắm qua `.env`: `VISUAL_PROVIDER`/`ASSET_PROVIDER`/`COPYRIGHT_PROVIDER` + `ASSET_SOURCE_HINT`
 
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.

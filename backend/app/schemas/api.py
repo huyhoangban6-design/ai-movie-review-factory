@@ -9,6 +9,11 @@ from app.schemas.scripting import (
     TimelineOutput,
     VoiceOutput,
 )
+from app.schemas.visual import (
+    AssetActionResult,
+    CopyrightEvaluateResult,
+    VisualPlanMetadata,
+)
 
 
 class UserOut(BaseModel):
@@ -181,3 +186,32 @@ class TimelineResult(BaseModel):
     script_id: int
     generation_id: int | None = None
     timeline: TimelineOutput
+
+
+# ---------- Phase 4: visual plan / assets / copyright ----------
+class VisualPlanRequest(BaseModel):
+    script_id: int
+
+
+class VisualPlanResult(BaseModel):
+    job_id: int
+    script_id: int
+    visual_plan: VisualPlanMetadata
+    pipeline_status: str = "visual_plan"
+
+
+class AssetSearchRequestOut(BaseModel):
+    script_id: int
+    result: AssetActionResult
+
+
+class AssetGenerateResult(BaseModel):
+    job_id: int
+    script_id: int
+    result: AssetActionResult
+
+
+class CopyrightEvaluateOut(BaseModel):
+    job_id: int
+    script_id: int
+    result: CopyrightEvaluateResult

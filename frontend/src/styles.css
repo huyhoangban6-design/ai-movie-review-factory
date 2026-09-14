@@ -453,14 +453,20 @@ textarea:focus {
 }
 
 .voice-info,
-.timeline-info {
+.timeline-info,
+.visual-plan-info,
+.assets-info,
+.copyright-info {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
 
 .timeline-info h3,
-.voice-info h3 {
+.voice-info h3,
+.visual-plan-info h3,
+.assets-info h3,
+.copyright-info h3 {
   margin: 0 0 6px;
   font-size: 14.5px;
 }

@@ -54,6 +54,8 @@ class Script(BaseORM):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     word_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     estimated_duration_s: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    visual_plan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    pipeline_status: Mapped[str] = mapped_column(String(24), default="script", nullable=False)
 
     segments: Mapped[list["ScriptSegment"]] = relationship(
         back_populates="script", cascade="all, delete-orphan", order_by="ScriptSegment.position"

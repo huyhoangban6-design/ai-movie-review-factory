@@ -20,12 +20,23 @@ from app.schemas.scripting import (
     VoiceOutput,
     WordTimestamp,
 )
+from app.schemas.visual import (
+    SECTION_ASSET_MAP,
+    AssetCreate,
+    CopyrightReviewInput,
+    CopyrightReviewOutput,
+    VisualPlanMetadata,
+    VisualPlanSegment,
+)
 from app.services.base import (
     AngleProvider,
+    AssetProvider,
+    CopyrightProvider,
     OpportunityProvider,
     ResearchProvider,
     ScriptProvider,
     TimelineProvider,
+    VisualPlannerProvider,
     VoiceProvider,
 )
 
@@ -313,3 +324,128 @@ class OfflineTimelineProvider(TimelineProvider):
             )
         total = out[-1].end_s if out else 0.0
         return TimelineOutput(total_duration_s=round(total, 3), segments=out, matches=True)
+
+
+# ---------- Phase 4: visual plan / assets / copyright ----------
+class OfflineVisualPlannerProvider(VisualPlannerProvider):
+    name = "offline"
+
+    def plan(self, segments: list[object]) -> VisualPlanMetadata:
+        plan_segments: list[VisualPlanSegment] = []
+        for i, seg in enumerate(segments):
+            section = getattr(seg, "section", "analysis")
+            mapping = SECTION_ASSET_MAP.get(section, SECTION_ASSET_MAP["analysis"])
+            est = getattr(seg, "duration_estimate_s", None) or mapping["duration_s"]
+            duration = max(est, mapping["duration_s"]) if est else mapping["duration_s"]
+            plan_segments.append(
+                VisualPlanSegment(
+                    segment_index=i,
+                    section=section,
+                    purpose=mapping["purpose"],
+                    asset_types=list(mapping["asset_types"]),
+                    duration_s=round(min(duration, max(mapping["duration_s"], 8.0)), 2),
+                    notes=mapping["notes"],
+                )
+            )
+        total = round(sum(p.duration_s for p in plan_segments), 2)
+        return VisualPlanMetadata(strategy_version="v1", total_planned_duration_s=total, segments=plan_segments)
+
+
+class OfflineAssetProvider(AssetProvider):
+    name = "offline"
+
+    def acquire(
+        self,
+        visual_plan: VisualPlanMetadata,
+        segment_index: int | None,
+        source_hint: str,
+    ) -> list[AssetCreate]:
+        targets = (
+            [p for p in visual_plan.segments if p.segment_index == segment_index]
+            if segment_index is not None
+            else visual_plan.segments
+        )
+        out: list[AssetCreate] = []
+        for i, p in enumerate(targets, start=1):
+            primary_type = p.asset_types[0] if p.asset_types else "ai_image"
+            out.append(
+                AssetCreate(
+                    segment_index=p.segment_index,
+                    asset_type=primary_type,
+                    title=f"Visual {p.segment_index + 1} — {p.section}",
+                    source=source_hint,
+                    source_url=f"https://assets.example.com/offline/{p.segment_index}.{primary_type}",
+                    license="CC0",
+                    commercial_use="yes",
+                    owner_name="movie-review-factory/offline",
+                    acquisition_time=round(p.duration_s, 2),
+                    usage_context=p.purpose,
+                    duration_s=round(min(p.duration_s, 3.0), 2) if primary_type == "clip" else None,
+                    transformations=["color_graded"],
+                    risk_score=0.0,
+                    file_url=f"https://assets.example.com/offline/{p.segment_index}.png",
+                    thumbnail_url=f"https://assets.example.com/offline/thumb/{p.segment_index}.png",
+                )
+            )
+        return out
+
+
+class OfflineCopyrightProvider(CopyrightProvider):
+    name = "offline"
+
+    def evaluate(self, asset: AssetLike) -> CopyrightReviewOutput:
+        notes: list[str] = []
+        risk = 0.0
+        duration_warning = False
+        human = False
+
+        commercial = (asset.commercial_use or "").lower()
+        if commercial == "no":
+            risk += 0.6
+            notes.append("commercial_use=no → bị cấm dùng thương mại (block/replace).")
+        elif commercial == "unknown":
+            risk += 0.2
+            notes.append("commercial_use=unknown → cần xác minh giấy phép.")
+        else:
+            notes.append("commercial_use=yes — hợp lệ cho kênh thương mại.")
+
+        if not asset.license:
+            risk += 0.2
+            notes.append("Thiếu license metadata — không được vào final render (docs/09).")
+
+        duration = asset.duration_s or 0.0
+        if duration > 3.0:
+            duration_warning = True
+            risk += 0.3
+            notes.append(
+                "WARNING (3-second rule): clip > 3.0 giây → Human Review bắt buộc; "
+                "dưới 3.0 giây vẫn đánh giá context/source/license."
+            )
+        elif duration > 0:
+            notes.append("Clip ≤ 3.0 giây — vẫn cần đánh giá transform/cảnh quay; không mặc định an toàn.")
+
+        if risk >= 0.5:
+            level = "high"
+            human = True
+            decision = "block"
+        elif risk >= 0.2 or duration_warning:
+            level = "medium"
+            human = True
+            decision = "human_review"
+        else:
+            level = "low"
+            human = False
+            decision = "approved"
+
+        if level == "low":
+            notes.append("LOW → auto approve; asset có provenance/license đầy đủ.")
+
+        return CopyrightReviewOutput(
+            asset_id=getattr(asset, "id", 0),
+            risk_level=level,
+            duration_warning=duration_warning,
+            human_review_required=human,
+            policy_notes=notes,
+            decision=decision,
+            notes="; ".join(notes),
+        )

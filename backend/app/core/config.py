@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     default_voice_model: str = "offline-vi-female"
     default_voice_id: str = "offline-vi-female-1"
 
+    # ---- Phase 4: visual plan / assets / copyright providers ----
+    visual_provider: str = "offline"
+    asset_provider: str = "offline"
+    copyright_provider: str = "offline"
+    asset_source_hint: str = "ai_generated"
+
 
 @lru_cache
 def get_settings() -> Settings:

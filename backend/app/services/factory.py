@@ -1,10 +1,13 @@
 from app.core.config import settings
 from app.services.providers import (
     OfflineAngleProvider,
+    OfflineAssetProvider,
+    OfflineCopyrightProvider,
     OfflineOpportunityProvider,
     OfflineResearchProvider,
     OfflineScriptProvider,
     OfflineTimelineProvider,
+    OfflineVisualPlannerProvider,
     OfflineVoiceProvider,
 )
 
@@ -43,3 +46,21 @@ def get_timeline_provider() -> OfflineTimelineProvider:
     if settings.timeline_provider.lower() == "offline":
         return OfflineTimelineProvider()
     return OfflineTimelineProvider()
+
+
+def get_visual_planner_provider() -> OfflineVisualPlannerProvider:
+    if settings.visual_provider.lower() == "offline":
+        return OfflineVisualPlannerProvider()
+    return OfflineVisualPlannerProvider()
+
+
+def get_asset_provider() -> OfflineAssetProvider:
+    if settings.asset_provider.lower() == "offline":
+        return OfflineAssetProvider()
+    return OfflineAssetProvider()
+
+
+def get_copyright_provider() -> OfflineCopyrightProvider:
+    if settings.copyright_provider.lower() == "offline":
+        return OfflineCopyrightProvider()
+    return OfflineCopyrightProvider()

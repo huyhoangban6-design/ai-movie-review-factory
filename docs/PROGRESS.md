@@ -9,7 +9,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 1 | Skeleton + DB + auth + dashboard | ✅ Hoàn tất (commit `7aedf8c`) |
 | 2 | Movie research → opportunity → angle | ✅ Hoàn tất (commit `85d7c4d`) |
 | 3 | Script → voice → timestamps | ✅ Hoàn tất (commit `ce7b366`) |
-| 4 | Visual plan → assets → copyright gate | ⬜ Chưa bắt đầu |
+| 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit TBD) |
 | 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
 | 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
 | 7 | Analytics → experiments → learning | ⬜ Chưa bắt đầu |
@@ -66,6 +66,20 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - CP2 (duyệt kịch bản script) & CP3 (duyệt voice) chưa có UI/workflow — hiện script tự `draft`.
 - Timeline hiện ở mức segment; Visual Planner (Phase 4) sẽ căn từ segment → visual beats.
 - Vẫn chưa chạy tests thật trong sandbox — cần chạy local.
+
+## Phase 4 — đã làm
+- Models mới (migration `20260914_0004`): `assets` (+ `asset_sources` provenance/license/risk metadata), `copyright_reviews` (risk_level low/medium/high, duration_warning, human_review_required, decision block/human_review/approved). Script model mở rộng thêm `visual_plan` (JSON list VisualPlanSegment) + `pipeline_status` (script → visual_plan → assets → copyright).
+- Provider layer Phase 4: `VisualPlannerProvider` / `AssetProvider` / `CopyrightProvider` + offline deterministic.
+  - Visual planner: map từng script segment → section-appropriate plan (asset_types, duration_s, purpose), deterministic.
+  - Asset provider: tạo placeholder CC0 hoặc theo source_hint; replacement-based (xóa asset cũ trước khi tạo mới).
+  - Copyright provider: risk scoring — commercial_use=no → +0.6 block, missing license → +0.2, clip > 3.0s → duration_warning +0.3 human_review_required.
+- API mới (auth + job lifecycle):
+  - `POST /visual/plan` → sinh visual plan từ script segments; lưu vào `scripts.visual_plan`, cập nhật `pipeline_status`.
+  - `POST /assets/generate` / `POST /assets/search` → tạo asset theo visual plan; lưu `assets`, set `pipeline_status=assets`.
+  - `POST /copyright/evaluate` → đánh giá asset版权; lưu `copyright_reviews`, set `pipeline_status=copyright`, trả human_review_count + blocked_count.
+  - `GET /scripts/{id}` mở rộng trả `visual_plan`, `assets`, `copyright_reviews`, `pipeline_status`.
+- Frontend `MovieDetailView`: thêm 3 nút pipeline (Phân plan → Tạo hình → Kiểm bản quyền), hiển thị visual plan segments + assets list + copyright risk badges.
+- Tests offline: visual plan mapping, asset generation + replacement, 3-second rule, commercial_use block, copyright ownership isolation.
 
 ## Phase 2 — còn thiếu / lưu ý
 - Provider thật (TMDB/web/LLM) chưa cắm — cần key ở `.env` (xem `.env.example`). Cấu trúc adapter đã sẵn sàng.
