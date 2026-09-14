@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.movie import ContentAngle, Movie, MovieAnalysis, MovieSource, Opportunity
+from app.models.scripting import Script
 from app.models.user import User
 from app.schemas.movie import MovieDetailOut
+from app.schemas.scripting import ScriptSummaryOut
 
 router = APIRouter(prefix="/movies", tags=["movies"])
 
@@ -26,6 +28,9 @@ def get_movie_detail(
         db.scalars(
             select(ContentAngle).where(ContentAngle.movie_id == movie.id).order_by(ContentAngle.id)
         )
+    )
+    scripts = list(
+        db.scalars(select(Script).where(Script.movie_id == movie.id).order_by(Script.id.desc()))
     )
 
     summaries = [a.summary for a in analyses if a.summary]
@@ -53,4 +58,5 @@ def get_movie_detail(
         opportunity=opp,
         angles=angles,
         facts=facts,
+        scripts=[ScriptSummaryOut.model_validate(s, from_attributes=True) for s in scripts],
     )

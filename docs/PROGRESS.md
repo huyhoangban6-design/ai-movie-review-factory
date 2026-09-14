@@ -7,8 +7,8 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 |---|---|---|
 | 0 | Docs thiết kế (00–15) | ✅ Hoàn tất |
 | 1 | Skeleton + DB + auth + dashboard | ✅ Hoàn tất (commit `7aedf8c`) |
-| 2 | Movie research → opportunity → angle | 🚧 Đang triển khai (xem bên dưới) |
-| 3 | Script → voice → timestamps | ⬜ Chưa bắt đầu |
+| 2 | Movie research → opportunity → angle | ✅ Hoàn tất (commit `85d7c4d`) |
+| 3 | Script → voice → timestamps | 🚧 Đang triển khai (xem bên dưới) |
 | 4 | Visual plan → assets → copyright gate | ⬜ Chưa bắt đầu |
 | 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
 | 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
@@ -46,6 +46,27 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Frontend: form "Nghiên cứu phim" trên dashboard, `MovieDetailView` hiện điểm cơ hội + góc nội dung (CP1).
 - `create_project` không còn tạo job kickoff giả (nghiên cứu có endpoint riêng).
 
+## Phase 3 — đã làm
+- Models mới (migration `20260914_0003`): `scripts` (+`script_segments` theo sơ đồ HOOK→THESIS→…→CTA), `voice_providers` (tier cloud/gpu/self_hosted/backup + license + cost), `voice_profiles` (voice_id/provider/model/style/speed/emotion/commercial_use/license/cloning_permission), `voice_generations` (text_hash cache, audio, word+sentence timestamps, license_info, cost), `script_timelines` (segment→time để Visual Planner Phase 4 căn theo voice).
+- Provider layer mở rộng: `ScriptProvider`/`VoiceProvider`/`TimelineProvider` + offline impl deterministic.
+  - Script: 9 segments đúng cấu trúc Script Agent; `estimated_duration_s` theo tốc độ đọc.
+  - Voice: license gate `commercial_use=no → block`, `unknown → risk note`; tạo profile mặc định `offline-vi-female` khi chưa có; timestamps giả lập theo độ dài câu/từ + cache hash.
+  - Timeline: căn từng segment theo sentence timestamps của voice (char-position alignment), phục vụ Visual Planner.
+- API mới (auth + job lifecycle như Phase 2):
+  - `POST /scripts/generate` → tạo `scripts` + `script_segments` + job `script`; version tăng dần theo movie.
+  - `GET /scripts/{id}` → detail script + segments + voice mới nhất + timeline.
+  - `POST /voice/generate` → TTS theo profile (tự tạo mặc định), license gate, job `voice`; sinh `voice_generations`.
+  - `POST /timeline/build` → yêu cầu có voice trước (422 nếu chưa), replace `script_timelines` + job `timeline`.
+  - `GET /movies/{id}` → có thêm `scripts` (summary).
+- Frontend: `MovieDetailView` thêm pipeline buttons (Viết kịch bản → Tạo giọng đọc → Dựng timeline) + hiển thị segments/timeline/voice (xem dưới).
+- `.env.example`: thêm `SCRIPT_PROVIDER`/`VOICE_PROVIDER`/`TIMELINE_PROVIDER` + `DEFAULT_VOICE_*`.
+
+## Phase 3 — còn thiếu / lưu ý
+- Provider TTS thật (elevenlabs/google/azure) chưa cắm — offline có timestamps giả lập. Cấu trúc adapter + license gate đã sẵn sàng.
+- CP2 (duyệt kịch bản script) & CP3 (duyệt voice) chưa có UI/workflow — hiện script tự `draft`.
+- Timeline hiện ở mức segment; Visual Planner (Phase 4) sẽ căn từ segment → visual beats.
+- Vẫn chưa chạy tests thật trong sandbox — cần chạy local.
+
 ## Phase 2 — còn thiếu / lưu ý
 - Provider thật (TMDB/web/LLM) chưa cắm — cần key ở `.env` (xem `.env.example`). Cấu trúc adapter đã sẵn sàng.
 - CP1 confirm (chọn/bỏ góc nội dung) chưa có UI — hiện mặc định giữ nguyên 6 góc đầu.
@@ -66,4 +87,4 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 1. Copy `.env.example` → `.env`, đặt `SECRET_KEY` mạnh, điền provider keys nếu dùng provider thật.
 2. Cài Python 3.12 + Node 20, hoặc Docker.
 3. Chạy migration rồi khởi động theo README.
-4. Sau khi chạy `/movies/research` + `/opportunities/score` + `/content/angles`, kiểm tra `GET /movies/{id}` để xem kết quả.
+4. Trên một movie, chạy đủ pipeline Phase 3 để kiểm tra: `/movies/research` → `/opportunities/score` → `/content/angles` → `/scripts/generate` → `/voice/generate` → `/timeline/build`, rồi xem `GET /movies/{id}` + `GET /scripts/{id}`.

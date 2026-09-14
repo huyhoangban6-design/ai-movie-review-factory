@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.schemas.research import Angle, OpportunityScoreOutput, ResearchedSource
+from app.schemas.scripting import ScriptSummaryOut
 
 
 class SourceOut(ResearchedSource):
@@ -40,3 +41,4 @@ class MovieDetailOut(MovieOut):
     opportunity: OpportunityOut | None = None
     angles: list[Angle] = []
     facts: list[str] = []
+    scripts: list[ScriptSummaryOut] = []

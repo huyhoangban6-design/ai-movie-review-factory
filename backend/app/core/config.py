@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     # Key cho provider thật (tùy chọn trong Phase 2; TMDB dùng định dạng API v3).
     tmdb_api_key: str = ""
 
+    # ---- Phase 3: script / voice / timeline providers ----
+    script_provider: str = "offline"
+    voice_provider: str = "offline"
+    timeline_provider: str = "offline"
+    # Voice profile mặc định khi /voice/generate không truyền voice_profile_id.
+    default_voice_provider: str = "offline"
+    default_voice_model: str = "offline-vi-female"
+    default_voice_id: str = "offline-vi-female-1"
+
 
 @lru_cache
 def get_settings() -> Settings:

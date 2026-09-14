@@ -4,6 +4,11 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.job import JobStatus, JobType
 from app.schemas.research import Angle, MovieResearchOutput, OpportunityScoreOutput
+from app.schemas.scripting import (
+    ScriptOutput,
+    TimelineOutput,
+    VoiceOutput,
+)
 
 
 class UserOut(BaseModel):
@@ -133,3 +138,46 @@ class AnglesResult(BaseModel):
     job_id: int
     movie_id: int
     angles: list[Angle]
+
+
+# ---------- Phase 3: script / voice / timeline ----------
+class ScriptRequest(BaseModel):
+    movie_id: int
+    angle_id: int | None = Field(default=None)
+    version: int = Field(default=1, ge=1)
+
+
+class ScriptResult(BaseModel):
+    job_id: int
+    script_id: int
+    movie_id: int
+    angle_id: int | None = None
+    version: int = 1
+    script: ScriptOutput
+
+
+class VoiceRequest(BaseModel):
+    script_id: int
+    voice_profile_id: int | None = Field(default=None)
+    speed: float | None = Field(default=None, ge=0.5, le=2.0)
+
+
+class VoiceResult(BaseModel):
+    job_id: int
+    generation_id: int
+    script_id: int
+    voice_profile_id: int | None = None
+    voice: VoiceOutput
+
+
+class TimelineRequest(BaseModel):
+    script_id: int
+    generation_id: int | None = Field(default=None)
+
+
+class TimelineResult(BaseModel):
+    job_id: int
+    timeline_id: int
+    script_id: int
+    generation_id: int | None = None
+    timeline: TimelineOutput

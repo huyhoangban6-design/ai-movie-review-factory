@@ -408,6 +408,88 @@ textarea:focus {
   font-size: 14.5px;
 }
 
+/* ---------- phase 3: pipeline / script / voice / timeline ---------- */
+.pipeline-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.pipeline-grid .btn {
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segments-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.segment-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.segment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.segment-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.voice-info,
+.timeline-info {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.timeline-info h3,
+.voice-info h3 {
+  margin: 0 0 6px;
+  font-size: 14.5px;
+}
+
+.timeline-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+
+.badge-small {
+  font-size: 11px;
+  padding: 2px 7px;
+  min-width: 22px;
+  text-align: center;
+}
+
 /* ---------- misc ---------- */
 @media (min-width: 640px) {
   .form-grid {

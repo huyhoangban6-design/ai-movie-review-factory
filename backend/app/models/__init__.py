@@ -11,10 +11,22 @@ from app.models.movie import (
     Opportunity,
 )
 from app.models.project import Project
+from app.models.scripting import (
+    CommercialUse,
+    Script,
+    ScriptSegment,
+    ScriptStatus,
+    ScriptTimeline,
+    VoiceGeneration,
+    VoiceProfile,
+    VoiceProvider,
+    VoiceRouteTier,
+)
 from app.models.user import User
 
 __all__ = [
     "Base",
+    "CommercialUse",
     "Competitor",
     "CompetitorVideo",
     "ContentAngle",
@@ -25,5 +37,13 @@ __all__ = [
     "MovieSource",
     "Opportunity",
     "Project",
+    "Script",
+    "ScriptSegment",
+    "ScriptStatus",
+    "ScriptTimeline",
     "User",
+    "VoiceGeneration",
+    "VoiceProfile",
+    "VoiceProvider",
+    "VoiceRouteTier",
 ]

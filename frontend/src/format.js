@@ -10,6 +10,26 @@ export function formatDate(value) {
   return d.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+export function formatDuration(seconds) {
+  if (seconds == null || Number.isNaN(seconds)) return '—'
+  const total = Math.round(seconds)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
+}
+
+export const SCRIPT_SECTION_LABEL = {
+  hook: 'Hook (mở hấp dẫn)',
+  thesis: 'Luận điểm chính',
+  context: 'Bối cảnh phim',
+  analysis: 'Phân tích',
+  evidence: 'Bằng chứng / ví dụ',
+  character_theme: 'Nhân vật & chủ đề',
+  critique: 'Phê bình',
+  conclusion: 'Kết luận',
+  cta: 'Kêu gọi hành động',
+}
+
 export const STATUS_LABEL = {
   pending: 'Chờ xử lý',
   running: 'Đang chạy',

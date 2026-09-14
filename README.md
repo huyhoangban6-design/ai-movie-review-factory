@@ -60,8 +60,15 @@ cd frontend && npm test                                  # frontend (vitest)
 - `POST /api/v1/movies/research` — nghiên cứu phim (title + năm) → Movie, mặc định provider `offline`
 - `POST /api/v1/opportunities/score` — chấm điểm cơ hội (weighted) cho movie
 - `POST /api/v1/content/angles` — sinh góc nội dung (CP1), thay thế góc cũ của movie
-- `GET  /api/v1/movies/{id}` — chi tiết movie: sources, research, score, angles
+- `GET  /api/v1/movies/{id}` — chi tiết movie: sources, research, score, angles, scripts
 - Provider thật (TMDB/LLM/web search) cắm qua `.env`: `RESEARCH_PROVIDER`/`OPPORTUNITY_PROVIDER`/`ANGLE_PROVIDER` + keys
+
+## API (Phase 3 — kịch bản, giọng đọc, timestamps)
+- `POST /api/v1/scripts/generate` — viết kịch bản (HOOK→THESIS→…→CTA, CP2), version mỗi lần chạy
+- `GET  /api/v1/scripts/{id}` — chi tiết script: segments, voice mới nhất, timeline
+- `POST /api/v1/voice/generate` — TTS theo voice profile (license gate thương mại); tự tạo profile mặc định
+- `POST /api/v1/timeline/build` — căn từng segment theo timestamps của voice (chuẩn bị cho Visual Planner Phase 4)
+- Provider thật (TTS) cắm qua `.env`: `SCRIPT_PROVIDER`/`VOICE_PROVIDER`/`TIMELINE_PROVIDER` + keys
 
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.

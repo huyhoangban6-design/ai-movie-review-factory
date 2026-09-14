@@ -13,6 +13,9 @@ from app.api.movies import router as movies_router
 from app.api.opportunity import router as opportunity_router
 from app.api.projects import router as projects_router
 from app.api.research import router as research_router
+from app.api.scripts import router as scripts_router
+from app.api.timeline import router as timeline_router
+from app.api.voice import router as voice_router
 from app.core.config import settings
 from app.core.database import Base, engine
 
@@ -51,6 +54,9 @@ app.include_router(research_router, prefix=settings.api_v1_prefix)
 app.include_router(opportunity_router, prefix=settings.api_v1_prefix)
 app.include_router(angles_router, prefix=settings.api_v1_prefix)
 app.include_router(movies_router, prefix=settings.api_v1_prefix)
+app.include_router(scripts_router, prefix=settings.api_v1_prefix)
+app.include_router(voice_router, prefix=settings.api_v1_prefix)
+app.include_router(timeline_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/health", tags=["system"])
