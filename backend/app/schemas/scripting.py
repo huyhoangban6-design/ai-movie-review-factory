@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.render import QAReportOutput, RenderOutput, SubtitleOutput
 from app.schemas.research import Angle
 from app.schemas.visual import AssetOut, CopyrightReviewOutput, VisualPlanMetadata
 
@@ -139,6 +140,42 @@ class TimelineOut(BaseModel):
     created_at: datetime
 
 
+class VideoRenderOut(BaseModel):
+    id: int
+    status: str
+    video_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    resolution: Optional[str] = None
+    fps: Optional[int] = None
+    video_codec: Optional[str] = None
+    audio_codec: Optional[str] = None
+    duration_s: Optional[float] = None
+    file_size_bytes: Optional[int] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+
+
+class SubtitleOut(BaseModel):
+    id: int
+    format: str
+    language: str
+    duration_s: Optional[float] = None
+    cue_count: int = 0
+    content: Optional[str] = None
+    created_at: datetime
+
+
+class QAReportOut(BaseModel):
+    id: int
+    gate: str
+    passed: bool
+    mandatory: bool = False
+    checks: Optional[list] = None
+    severity: str = "pass"
+    notes: Optional[str] = None
+    created_at: datetime
+
+
 class ScriptDetailOut(BaseModel):
     id: int
     movie_id: int
@@ -156,3 +193,6 @@ class ScriptDetailOut(BaseModel):
     visual_plan: Optional[VisualPlanMetadata] = None
     assets: list[AssetOut] = Field(default_factory=list)
     copyright_reviews: list[CopyrightReviewOutput] = Field(default_factory=list)
+    renders: list[VideoRenderOut] = Field(default_factory=list)
+    subtitles: list[SubtitleOut] = Field(default_factory=list)
+    qa_reports: list[QAReportOut] = Field(default_factory=list)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.job import Job, JobStatus, JobType
@@ -27,6 +28,19 @@ def create_job(
     db.add(job)
     db.flush()
     return job
+
+
+def next_attempt_key(db: Session, owner_id: int, job_type: JobType, base: str) -> str:
+    """Ghép base key với số lần chạy trước để idempotency key luôn unique cho các
+    thao tác chạy lại được (script v2, asset replace, render lại…)."""
+    attempts = db.scalar(
+        select(func.count(Job.id)).where(
+            Job.owner_id == owner_id,
+            Job.job_type == job_type,
+            Job.idempotency_key.like(f"{owner_id}:{base}:%"),
+        )
+    ) or 0
+    return f"{owner_id}:{base}:{attempts + 1}"
 
 
 def mark_job_success(db: Session, job: Job, output: Any) -> Job:

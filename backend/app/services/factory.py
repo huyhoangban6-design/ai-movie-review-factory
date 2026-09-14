@@ -4,8 +4,11 @@ from app.services.providers import (
     OfflineAssetProvider,
     OfflineCopyrightProvider,
     OfflineOpportunityProvider,
+    OfflineQAProvider,
+    OfflineRenderProvider,
     OfflineResearchProvider,
     OfflineScriptProvider,
+    OfflineSubtitleProvider,
     OfflineTimelineProvider,
     OfflineVisualPlannerProvider,
     OfflineVoiceProvider,
@@ -64,3 +67,21 @@ def get_copyright_provider() -> OfflineCopyrightProvider:
     if settings.copyright_provider.lower() == "offline":
         return OfflineCopyrightProvider()
     return OfflineCopyrightProvider()
+
+
+def get_render_provider() -> OfflineRenderProvider:
+    if settings.render_provider.lower() == "offline":
+        return OfflineRenderProvider()
+    return OfflineRenderProvider()
+
+
+def get_subtitle_provider() -> OfflineSubtitleProvider:
+    if settings.subtitle_provider.lower() == "offline":
+        return OfflineSubtitleProvider()
+    return OfflineSubtitleProvider()
+
+
+def get_qa_provider() -> OfflineQAProvider:
+    if settings.qa_provider.lower() == "offline":
+        return OfflineQAProvider()
+    return OfflineQAProvider()

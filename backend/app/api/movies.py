@@ -7,7 +7,8 @@ from app.core.database import get_db
 from app.models.movie import ContentAngle, Movie, MovieAnalysis, MovieSource, Opportunity
 from app.models.scripting import Script
 from app.models.user import User
-from app.schemas.movie import MovieDetailOut
+from app.schemas.movie import MovieDetailOut, OpportunityOut, SourceOut
+from app.schemas.research import Angle
 from app.schemas.scripting import ScriptSummaryOut
 
 router = APIRouter(prefix="/movies", tags=["movies"])
@@ -53,10 +54,40 @@ def get_movie_detail(
         tmdb_id=movie.tmdb_id,
         status="verified",
         created_at=movie.created_at,
-        sources=sources,
+        sources=[
+            SourceOut(
+                id=s.id,
+                source_type=s.source_type,
+                source_url=s.source_url,
+                title=s.title,
+                publisher=s.publisher,
+                published_at=s.published_at,
+                summary=s.summary,
+                provenance=s.provenance,
+            )
+            for s in sources
+        ],
         summaries=summaries,
-        opportunity=opp,
-        angles=angles,
+        opportunity=OpportunityOut(
+            id=opp.id,
+            overall=float(opp.overall_score) if opp.overall_score is not None else None,
+            sub_scores=opp.sub_scores,
+            confidence=float(opp.confidence) if opp.confidence is not None else None,
+            rationale=opp.rationale,
+            created_at=opp.created_at,
+        )
+        if opp
+        else None,
+        angles=[
+            Angle(
+                angle_type=a.angle_type or "unknown",
+                title=a.title,
+                summary=a.summary or "",
+                hook=a.hook or "",
+                rationale=a.rationale or "",
+            )
+            for a in angles
+        ],
         facts=facts,
         scripts=[ScriptSummaryOut.model_validate(s, from_attributes=True) for s in scripts],
     )

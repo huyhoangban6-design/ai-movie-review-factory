@@ -12,7 +12,7 @@ from app.models.user import User
 from app.schemas.api import AnglesResult, ScoreRequest
 from app.schemas.research import Angle
 from app.services.factory import get_angle_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/content/angles", tags=["angles"])
 
@@ -37,7 +37,7 @@ def generate_angles(
         db,
         current_user.id,
         JobType.CONTENT_ANGLE,
-        idempotency_key=f"{current_user.id}:angles:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.CONTENT_ANGLE, f"angles:{key}"),
         project_id=movie.project_id,
         input_payload={"movie_id": movie.id},
     )

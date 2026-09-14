@@ -10,7 +10,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 2 | Movie research → opportunity → angle | ✅ Hoàn tất (commit `85d7c4d`) |
 | 3 | Script → voice → timestamps | ✅ Hoàn tất (commit `ce7b366`) |
 | 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit `ad904f0`) |
-| 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
+| 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
 | 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
 | 7 | Analytics → experiments → learning | ⬜ Chưa bắt đầu |
 | 8 | Cost engine + fallback + production hardening | ⬜ Chưa bắt đầu |
@@ -65,7 +65,6 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Provider TTS thật (elevenlabs/google/azure) chưa cắm — offline có timestamps giả lập. Cấu trúc adapter + license gate đã sẵn sàng.
 - CP2 (duyệt kịch bản script) & CP3 (duyệt voice) chưa có UI/workflow — hiện script tự `draft`.
 - Timeline hiện ở mức segment; Visual Planner (Phase 4) sẽ căn từ segment → visual beats.
-- Vẫn chưa chạy tests thật trong sandbox — cần chạy local.
 
 ## Phase 4 — đã làm
 - Models mới (migration `20260914_0004`): `assets` (+ `asset_sources` provenance/license/risk metadata), `copyright_reviews` (risk_level low/medium/high, duration_warning, human_review_required, decision block/human_review/approved). Script model mở rộng thêm `visual_plan` (JSON list VisualPlanSegment) + `pipeline_status` (script → visual_plan → assets → copyright).
@@ -85,7 +84,6 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Provider thật (TMDB/web/LLM) chưa cắm — cần key ở `.env` (xem `.env.example`). Cấu trúc adapter đã sẵn sàng.
 - CP1 confirm (chọn/bỏ góc nội dung) chưa có UI — hiện mặc định giữ nguyên 6 góc đầu.
 - `competitors`/`competitor_videos` chưa được viết bởi endpoint (dự kiến Phase 7 nghiên cứu đối thủ qua analytics).
-- Vẫn chưa chạy được tests thật trong sandbox (thiếu pip/node) — cần chạy local.
 
 ## Phase 1 — còn thiếu / lưu ý
 - Môi trường sandbox hiện tại **không có pip/node/docker**, nên:
@@ -101,7 +99,33 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Provider thật (DALL-E/Midjourney/Unsplash) chưa cắm — offline deterministic placeholder. Cấu trúc adapter đã sẵn sàng.
 - CP5 (chọn/reject asset) chưa có UI — hiện auto-generate toàn bộ.
 - Asset search offline chỉ trả CC0 placeholder; cần provider thật để tìm footage thực.
-- Vẫn chưa chạy tests thật trong sandbox — cần chạy local.
+
+## Phase 5 — đã làm
+- Models mới (migration `20260914_0005_render_subtitle_qa`): `video_renders` (status, video_url, thumbnail, output_path, resolution/fps/codec, duration, file_size, render_config, render_log), `subtitles` (format srt/vtt, language, content, duration, cue_count, status), `qa_reports` (gate, passed, mandatory, checks JSON, severity, notes). Migration này cũng thêm `projects.idempotency_key` (unique) và làm `jobs.project_id` nullable.
+- Provider layer Phase 5: `RenderProvider` / `SubtitleProvider` / `QAProvider` + offline deterministic.
+  - Offline render: tạo metadata `1280x720@30`, h264/aac, `file://offline/render/{id}.mp4`, `file_size = duration * 240_000`, `render_ok=True` (mô phỏng đầu ra của ffmpeg, chưa mã hoá video thật).
+  - Offline subtitle: dựng SRT/VTT từ timeline segments (start/end/text), fallback transcript khi thiếu timeline.
+  - Offline QA: 8 gate — fact, script (không bắt buộc), voice, visual (đủ asset), subtitle (có + sync với render duration), copyright (không asset bị block), technical (render ok + duration + file + resolution/fps), final (chỉ pass khi mọi gate bắt buộc đạt).
+- API mới (auth + job lifecycle):
+  - `POST /video/render` → preconditions 422: chưa có voice hoàn tất / thiếu visual plan / thiếu asset / có asset bị block bản quyền; set `pipeline_status=render`.
+  - `POST /video/subtitle` → preconditions 422: chưa có timeline / chưa có voice; replace `subtitles`, set `pipeline_status=subtitle`.
+  - `POST /video/qa` → preconditions 422: chưa có render / subtitle; replace `qa_reports` mỗi lần chạy, set `pipeline_status=qa`, trả `final_passed`.
+  - `GET /scripts/{id}` mở rộng trả thêm `renders`, `subtitles`, `qa_reports`.
+- Frontend `MovieDetailView`: thêm 3 nút pipeline (Render video → Làm phụ đề → Chạy QA) + hiển thị video render info / subtitle / báo cáo QA (PASS/FAIL từng gate).
+- Tests (48 tests tất cả pass trong sandbox): `tests/test_phase5.py` — render preconditions, render success, block asset gate, subtitle SRT/VTT + replace, QA full pipeline pass, QA block khi asset bị block, script detail bao gồm render/subtitle/QA, ownership isolation.
+- Sửa bug cũ để cả suite chạy được: thêm import `SentenceLike`/`AssetLike` (providers), router auth thiếu prefix `/auth`, project idempotency dựa trên `Project.idempotency_key` thay vì job bị bỏ, `jobs.project_id` nullable, convert ORM→schema trong movie detail. Idempotency key giờ có counter per-attempt (`next_attempt_key`) nên các thao tác chạy lại (script v2, asset replace, render lại…) không vướng unique constraint.
+
+## Phase 5 — còn thiếu / lưu ý
+- Render chỉ ở mức offline metadata (không ffmpeg thật). Cắm provider thật bằng cách set `RENDER_PROVIDER`, `SUBTITLE_PROVIDER`, `QA_PROVIDER` (xem `.env.example`).
+- `job_type` subtitle dùng giá trị `subtitle` mới thêm vào enum `JobType` (không phải `qa`).
+- QA `script` gate không bắt buộc trong kết quả cuối; `QA_MANDATORY_GATES` khai báo nhưng kiểm tra dựa trên cờ `mandatory` từng gate.
+
+## Kiểm tra test thật (sandbox 2026-09-14)
+| Kiểm tra | Kết quả |
+|---|---|
+| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5) | ✅ 48 passed |
+| `tests/test_phase5.py` (render/subtitle/QA) | ✅ 10 passed |
+| Import toàn app `from app.main import app` + routes `/api/v1/video/*` | ✅ |
 
 ## Kiểm tra static (Phase 4, sandbox 2026-09-14)
 | Kiểm tra | Kết quả |
@@ -133,8 +157,8 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp ../.env.example ../.env           # chỉnh SECRET_KEY, DATABASE_URL nếu cần
 mkdir -p data                        # SQLite fallback
-alembic upgrade head                 # chạy migration 0001→0004
-pytest tests/test_phase4.py -v      # chạy 10 tests Phase 4
+alembic upgrade head                 # chạy migration 0001→0005
+pytest tests/ -v                     # 48 tests (auth → phase5)
 
 # 2. Backend — chạy server kiểm tra API
 python run.py                        # http://localhost:8000/docs

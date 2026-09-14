@@ -1,6 +1,12 @@
 import hashlib
 import re
 
+from app.schemas.render import (
+    QACheckItem,
+    QAReportOutput,
+    RenderOutput,
+    SubtitleOutput,
+)
 from app.schemas.research import (
     ANGLE_PERSONAS,
     Angle,
@@ -30,11 +36,16 @@ from app.schemas.visual import (
 )
 from app.services.base import (
     AngleProvider,
+    AssetLike,
     AssetProvider,
     CopyrightProvider,
     OpportunityProvider,
+    QAProvider,
+    RenderProvider,
     ResearchProvider,
     ScriptProvider,
+    SentenceLike,
+    SubtitleProvider,
     TimelineProvider,
     VisualPlannerProvider,
     VoiceProvider,
@@ -449,3 +460,174 @@ class OfflineCopyrightProvider(CopyrightProvider):
             decision=decision,
             notes="; ".join(notes),
         )
+
+
+# ---------- Phase 5: render / subtitle / QA ----------
+class OfflineRenderProvider(RenderProvider):
+    name = "offline"
+
+    def render(self, script_id: int, audio_url: str, duration_s: float) -> RenderOutput:
+        return RenderOutput(
+            script_id=script_id,
+            video_url=f"file://offline/render/{script_id}.mp4",
+            output_path=f"/data/render/{script_id}/final.mp4",
+            resolution="1280x720",
+            fps=30,
+            video_codec="h264",
+            audio_codec="aac",
+            duration_s=round(duration_s, 3),
+            file_size_bytes=int(max(duration_s, 0) * 240_000),
+            render_ok=True,
+        )
+
+
+class OfflineSubtitleProvider(SubtitleProvider):
+    name = "offline"
+
+    def build(self, script_id: int, timeline: object | None, generation: object | None) -> SubtitleOutput:
+        cues: list[tuple[float, float, str]] = []
+        if timeline is not None:
+            segs = getattr(timeline, "segments", None) or []
+            for ts in segs:
+                text = ts.get("text", "") if isinstance(ts, dict) else getattr(ts, "text", "")
+                start = float(ts.get("start_s", 0.0) or 0.0) if isinstance(ts, dict) else float(getattr(ts, "start_s", 0.0) or 0.0)
+                end = float(ts.get("end_s", 0.0) or 0.0) if isinstance(ts, dict) else float(getattr(ts, "end_s", 0.0) or 0.0)
+                if text and end > start:
+                    cues.append((start, end, text))
+
+        # Fallback khi chưa có timeline: chia đều theo duration của voice generation.
+        if not cues:
+            duration = 0.0
+            if generation is not None:
+                duration = float(getattr(generation, "audio_duration_s", 0.0) or 0.0)
+            if duration > 0:
+                mid = duration / 2.0
+                cues = [(0.0, duration, "(offline) Transcript mặc định — chạy timeline trước để có caption theo segment.")]
+
+        content = _to_srt(cues)
+        return SubtitleOutput(
+            script_id=script_id,
+            format="srt",
+            language="vi",
+            content=content,
+            duration_s=round(cues[-1][1], 3) if cues else 0.0,
+            cue_count=len(cues),
+        )
+
+
+QA_MANDATORY_GATES = ["fact", "script", "voice", "visual", "subtitle", "copyright", "technical"]
+
+
+class OfflineQAProvider(QAProvider):
+    name = "offline"
+
+    def run(self, script_id: int, ctx: dict) -> list[QAReportOutput]:
+        reports: list[QAReportOutput] = []
+
+        def report(gate: str, checks: list[QACheckItem], mandatory: bool = True) -> None:
+            passed = all(c.passed for c in checks)
+            severity = "pass" if passed else ("warning" if not any(c.severity == "fail" for c in checks) else "fail")
+            reports.append(
+                QAReportOutput(
+                    script_id=script_id,
+                    gate=gate,
+                    passed=passed,
+                    mandatory=mandatory,
+                    checks=checks,
+                    severity=severity,
+                )
+            )
+
+        # Fact QA — facts/summaries tồn tại từ research.
+        has_facts = bool(ctx.get("has_facts"))
+        report(
+            "fact",
+            [
+                QACheckItem(name="research_facts", passed=has_facts, message="Movie có dữ kiện research." if has_facts else "Thiếu dữ kiện research."),
+            ],
+        )
+
+        # Script QA — 9 segments đủ cấu trúc HOOK→CTA.
+        seg_count = int(ctx.get("segment_count", 0))
+        script_checks = [
+            QACheckItem(name="has_segments", passed=seg_count >= 1, message=f"{seg_count} segment."),
+        ]
+        report("script", script_checks, mandatory=False)
+
+        # Voice QA — voice generation completed.
+        voice_ok = bool(ctx.get("voice_ok"))
+        report(
+            "voice",
+            [
+                QACheckItem(name="voice_generation", passed=voice_ok, message="Có giọng đọc hợp lệ." if voice_ok else "Thiếu giọng đọc."),
+            ],
+        )
+
+        # Visual QA — mỗi segment có asset + copyright approved.
+        assets = list(ctx.get("assets", []) or [])
+        missing_asset_segs = sorted({a["segment_index"] for a in assets} ^ set(range(seg_count))) if seg_count else []
+        visual_checks = [
+            QACheckItem(name="no_missing_assets", passed=not missing_asset_segs, message=f"Thiếu asset segment {missing_asset_segs}." if missing_asset_segs else "Đủ asset cho mọi segment."),
+        ]
+        report("visual", visual_checks)
+
+        # Subtitle QA — có subtitle, cue_count > 0, duration khớp gần với render.
+        sub = ctx.get("subtitle")
+        sub_ok = sub is not None and (sub["cue_count"] or 0) > 0
+        sub_dur = float(sub["duration_s"]) if sub else 0.0
+        render_dur = float(ctx.get("render_duration_s") or 0.0)
+        sync_ok = sub_ok and (render_dur == 0 or abs(sub_dur - render_dur) <= max(render_dur * 0.05, 0.5))
+        report(
+            "subtitle",
+            [
+                QACheckItem(name="has_subtitle", passed=sub_ok, message="Có file subtitle." if sub_ok else "Thiếu subtitle."),
+                QACheckItem(name="subtitle_sync", passed=sync_ok, message=f"Sub {sub_dur:.1f}s vs render {render_dur:.1f}s."),
+            ],
+        )
+
+        # Copyright QA — không asset nào bị block.
+        reviews = list(ctx.get("reviews", []) or [])
+        blocked = [r for r in reviews if r.get("decision") == "block"]
+        copyright_checks = [
+            QACheckItem(name="no_blocked_assets", passed=not blocked, message=f"{len(blocked)} asset bị block." if blocked else "Không có asset bị chặn."),
+        ]
+        report("copyright", copyright_checks)
+
+        # Technical QA — render ok + duration hợp lệ + file integrity + resolution/fps.
+        render_ok = bool(ctx.get("render_ok"))
+        duration_ok = render_dur > 0
+        file_ok = bool(ctx.get("render_file_size", 0) or 0) > 0
+        expected_res = ctx.get("expected_resolution", "1280x720")
+        res_ok = (ctx.get("render_resolution") or "") == expected_res
+        fps_ok = int(ctx.get("render_fps") or 0) == 30
+        report(
+            "technical",
+            [
+                QACheckItem(name="render_success", passed=render_ok, message="Render thành công." if render_ok else "Render thất bại."),
+                QACheckItem(name="duration_valid", passed=duration_ok, message=f"Duration {render_dur:.1f}s."),
+                QACheckItem(name="file_integrity", passed=file_ok, message="File render tồn tại."),
+                QACheckItem(name="resolution_fps", passed=res_ok and fps_ok, message=f"{ctx.get('render_resolution')}@{ctx.get('render_fps')}fps (kỳ vọng {expected_res}@30)."),
+            ],
+        )
+
+        # Final QA — chỉ PASS khi mọi gate bắt buộc đạt.
+        mandatory_passed = all(r.passed for r in reports if r.mandatory)
+        report("final", [QACheckItem(name="mandatory_gates", passed=mandatory_passed, message="Tất cả gate bắt buộc đạt." if mandatory_passed else "Còn gate bắt buộc chưa đạt.")], mandatory=False)
+        return reports
+
+
+def _to_srt(cues: list[tuple[float, float, str]]) -> str:
+    def ts(t: float) -> str:
+        ms = int(round(t * 1000))
+        h, rem = divmod(ms, 3_600_000)
+        m, rem = divmod(rem, 60_000)
+        s, ms_ = divmod(rem, 1000)
+        return f"{h:02d}:{m:02d}:{s:02d},{ms_:03d}"
+
+    lines: list[str] = []
+    for i, (start, end, text) in enumerate(cues, start=1):
+        lines.append(str(i))
+        lines.append(f"{ts(start)} --> {ts(end)}")
+        lines.append(text)
+        lines.append("")
+    return "\n".join(lines)

@@ -39,15 +39,14 @@ def create_project(
     client_key = idempotency_key or f"client:{current_user.id}:{uuid4()}"
     scope = f"{current_user.id}:{client_key}"
     existing = db.scalar(
-        select(Job).where(Job.idempotency_key == scope, Job.owner_id == current_user.id)
+        select(Project).where(Project.idempotency_key == scope, Project.owner_id == current_user.id)
     )
     if existing is not None:
-        project = _get_owned_project(db, existing.project_id, current_user.id)
-        project.jobs = [existing]
-        return project
+        return existing
 
     project = Project(
         owner_id=current_user.id,
+        idempotency_key=scope,
         title=payload.title,
         description=payload.description,
         max_cost_per_video=payload.max_cost_per_video,

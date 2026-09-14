@@ -1,5 +1,6 @@
 from typing import Protocol
 
+from app.schemas.render import QAReportOutput, RenderOutput, SubtitleOutput
 from app.schemas.research import AnglesOutput, MovieResearchOutput, OpportunityScoreOutput
 from app.schemas.scripting import ScriptOutput, TimelineOutput, VoiceOutput
 from app.schemas.visual import (
@@ -93,3 +94,30 @@ class CopyrightProvider(Protocol):
     name: str = "offline"
 
     def evaluate(self, asset: AssetLike) -> CopyrightReviewOutput: ...
+
+
+# ---------- Phase 5: render / subtitle / QA ----------
+class RenderLike(Protocol):
+    script_id: int
+    video_url: str | None
+    audio_url: str | None
+    duration_s: float | None
+    fps: int | None
+
+
+class RenderProvider(Protocol):
+    name: str = "offline"
+
+    def render(self, script_id: int, audio_url: str, duration_s: float) -> RenderOutput: ...
+
+
+class SubtitleProvider(Protocol):
+    name: str = "offline"
+
+    def build(self, script_id: int, timeline: object | None, generation: object | None) -> SubtitleOutput: ...
+
+
+class QAProvider(Protocol):
+    name: str = "offline"
+
+    def run(self, script_id: int, context: dict) -> list[QAReportOutput]: ...

@@ -9,7 +9,7 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.models.user import User
 from app.schemas.api import LoginRequest, RegisterRequest, TokenOut, UserOut
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)

@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     copyright_provider: str = "offline"
     asset_source_hint: str = "ai_generated"
 
+    # ---- Phase 5: render / subtitle / QA providers ----
+    render_provider: str = "offline"
+    subtitle_provider: str = "offline"
+    qa_provider: str = "offline"
+    # Cấu hình render (offline dùng để QA so sánh kỳ vọng).
+    render_resolution: str = "1280x720"
+    render_fps: int = 30
+    render_audio_codec: str = "aac"
+    # Thư mục lưu output render (offline chỉ tạo URL placeholder).
+    render_output_dir: str = "/data/render"
+
 
 @lru_cache
 def get_settings() -> Settings:

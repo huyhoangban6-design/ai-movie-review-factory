@@ -11,7 +11,7 @@ from app.models.movie import Movie, Opportunity
 from app.models.user import User
 from app.schemas.api import ScoreRequest, ScoreResult
 from app.services.factory import get_opportunity_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/opportunities", tags=["opportunity"])
 
@@ -36,7 +36,7 @@ def score_movie(
         db,
         current_user.id,
         JobType.OPPORTUNITY_SCORE,
-        idempotency_key=f"{current_user.id}:opp:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.OPPORTUNITY_SCORE, f"opp:{key}"),
         project_id=movie.project_id,
         input_payload={"movie_id": movie.id},
     )

@@ -1,11 +1,17 @@
+import os
+from collections.abc import Generator
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
-from app.main import app
+# Test suite đăng ký rất nhiều user → tăng rate limit auth để không bị 429.
+os.environ.setdefault("AUTH_RATE_LIMIT_PER_MINUTE", "1000000")
+
+from app.core.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
 
 test_engine = create_engine(
     "sqlite+pysqlite:///:memory:",

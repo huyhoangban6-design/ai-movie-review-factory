@@ -11,6 +11,7 @@ from app.models.movie import (
     MovieSource,
     Opportunity,
 )
+from app.models.production import QACheckSeverity, QAGate, QAReport, RenderStatus, Subtitle, VideoRender
 from app.models.project import Project
 from app.models.scripting import (
     CommercialUse,
@@ -41,12 +42,18 @@ __all__ = [
     "MovieSource",
     "Opportunity",
     "Project",
+    "QACheckSeverity",
+    "QAGate",
+    "QAReport",
+    "RenderStatus",
     "RiskLevel",
     "Script",
     "ScriptSegment",
     "ScriptStatus",
     "ScriptTimeline",
+    "Subtitle",
     "User",
+    "VideoRender",
     "VoiceGeneration",
     "VoiceProfile",
     "VoiceProvider",

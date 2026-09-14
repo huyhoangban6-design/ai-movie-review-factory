@@ -19,6 +19,7 @@ class JobType(str, enum.Enum):
     ASSETS = "assets"
     COPYRIGHT = "copyright"
     RENDER = "render"
+    SUBTITLE = "subtitle"
     QA = "qa"
     UPLOAD = "upload"
     PUBLISH = "publish"
@@ -36,7 +37,9 @@ class Job(BaseORM):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=True
+    )
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     job_type: Mapped[JobType] = mapped_column(SAEnum(JobType, native_enum=False, length=32), nullable=False)
     status: Mapped[JobStatus] = mapped_column(SAEnum(JobStatus, native_enum=False, length=16), default=JobStatus.PENDING, nullable=False)

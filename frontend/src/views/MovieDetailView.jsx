@@ -11,7 +11,7 @@ export default function MovieDetailView() {
   const [scriptDetail, setScriptDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false, visualPlan: false, assets: false, copyright: false })
+  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false, visualPlan: false, assets: false, copyright: false, render: false, subtitle: false, qa: false })
 
   const load = useCallback(async () => {
     try {
@@ -127,6 +127,42 @@ export default function MovieDetailView() {
     finally { setBusy(b => ({ ...b, copyright: false })) }
   }
 
+  async function onRender() {
+    if (!scriptDetail) return
+    setBusy(b => ({ ...b, render: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/video/render', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, render: false })) }
+  }
+
+  async function onSubtitle() {
+    if (!scriptDetail) return
+    setBusy(b => ({ ...b, subtitle: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/video/subtitle', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, subtitle: false })) }
+  }
+
+  async function onQA() {
+    if (!scriptDetail) return
+    setBusy(b => ({ ...b, qa: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/video/qa', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, qa: false })) }
+  }
+
   if (loading) return <div className='muted'>Đang tải…</div>
   if (!movie) return <div className='error-banner'>{error || 'Không tìm thấy phim'}</div>
 
@@ -163,7 +199,7 @@ export default function MovieDetailView() {
           <button className='btn btn-primary' disabled={busy.voice || !scriptDetail} onClick={onVoice}>
             {busy.voice ? 'Đang tạo giọng…' : scriptDetail?.latest_generation ? 'Tạo giọng đọc lại' : 'Tạo giọng đọc'}
           </button>
-          <<button className='btn btn-primary' disabled={busy.timeline || !scriptDetail?.latest_generation} onClick={onTimeline}>
+          <button className='btn btn-primary' disabled={busy.timeline || !scriptDetail?.latest_generation} onClick={onTimeline}>
             {busy.timeline ? 'Đang dựng…' : scriptDetail?.timeline ? 'Dựng timeline lại' : 'Dựng timeline'}
           </button>
           <button className='btn btn-primary' disabled={busy.visualPlan || !scriptDetail} onClick={onVisualPlan}>
@@ -174,6 +210,15 @@ export default function MovieDetailView() {
           </button>
           <button className='btn btn-primary' disabled={busy.copyright || !scriptDetail?.assets?.length} onClick={onCopyright}>
             {busy.copyright ? 'Đang kiểm bản quyền…' : scriptDetail?.copyright_reviews?.length ? 'Kiểm lại bản quyền' : 'Kiểm bản quyền'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.render || !scriptDetail?.copyright_reviews?.length} onClick={onRender}>
+            {busy.render ? 'Đang render…' : scriptDetail?.renders?.length ? 'Render lại' : 'Render video'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.subtitle || !scriptDetail?.timeline} onClick={onSubtitle}>
+            {busy.subtitle ? 'Đang làm phụ đề…' : scriptDetail?.subtitles?.length ? 'Làm phụ đề lại' : 'Làm phụ đề'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.qa || !scriptDetail?.renders?.length || !scriptDetail?.subtitles?.length} onClick={onQA}>
+            {busy.qa ? 'Đang QA…' : 'Chạy QA'}
           </button>
         </div>
         {error && <div className='error-banner' style={{ marginTop: '0.5rem' }}>{error}</div>}
@@ -313,6 +358,53 @@ export default function MovieDetailView() {
                     <span className='muted small' style={{ marginLeft: 'auto' }}>
                       {rev.risk_level} {rev.duration_warning ? '· clip > 3s' : ''} {rev.human_review_required ? '· cần review' : ''}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.renders?.length > 0 && (
+            <div className='render-info'>
+              <h3>Video đã render</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.renders.map((r) => (
+                  <li key={r.id} className='timeline-item'>
+                    <span className='strong'>{r.resolution}@{r.fps}fps</span>
+                    <span className='muted small' style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                      {formatDuration(r.duration_s)} · {(r.file_size_bytes / 1024 / 1024).toFixed(1)} MB · {r.video_codec}/{r.audio_codec}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.subtitles?.length > 0 && (
+            <div className='subtitle-info'>
+              <h3>Phụ đề ({scriptDetail.subtitles.length})</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.subtitles.map((s) => (
+                  <li key={s.id} className='timeline-item'>
+                    <span className='strong'>{s.format.toUpperCase()}</span>
+                    <span className='muted small' style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                      {s.cue_count} cue · {formatDuration(s.duration_s)} · {s.language}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.qa_reports?.length > 0 && (
+            <div className='qa-info'>
+              <h3>Báo cáo QA</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.qa_reports.map((rep) => (
+                  <li key={rep.id} className='timeline-item'>
+                    <span className={`badge badge-small ${rep.passed ? '' : 'error-banner'}`}>{rep.passed ? 'PASS' : 'FAIL'}</span>
+                    <span className='strong'>{rep.gate}</span>
+                    {rep.severity !== 'pass' && <span className='muted small'>· {rep.severity}</span>}
                   </li>
                 ))}
               </ul>

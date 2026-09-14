@@ -25,7 +25,7 @@ from app.schemas.visual import (
     VisualPlanSegment,
 )
 from app.services.factory import get_asset_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -104,7 +104,7 @@ def search_assets(
         db,
         current_user.id,
         JobType.ASSETS,
-        idempotency_key=f"{current_user.id}:assetsearch:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.ASSETS, f"assetsearch:{key}"),
         project_id=project_id,
         input_payload={"script_id": script.id, "segment_index": payload.segment_index},
     )
@@ -138,7 +138,7 @@ def generate_assets(
         db,
         current_user.id,
         JobType.ASSETS,
-        idempotency_key=f"{current_user.id}:assetgen:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.ASSETS, f"assetgen:{key}"),
         project_id=project_id,
         input_payload={"script_id": script.id, "segment_index": payload.segment_index},
     )

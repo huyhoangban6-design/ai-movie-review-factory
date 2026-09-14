@@ -9,14 +9,18 @@ from app.core.database import get_db
 from app.models.assets import Asset, CopyrightReview
 from app.models.job import Job, JobType
 from app.models.movie import ContentAngle, Movie
+from app.models.production import QAReport, Subtitle, VideoRender
 from app.models.scripting import Script, ScriptSegment, ScriptTimeline, VoiceGeneration
 from app.models.user import User
 from app.schemas.api import ScriptRequest, ScriptResult
 from app.schemas.scripting import (
     GenerationOut,
+    QAReportOut,
     ScriptDetailOut,
     SegmentDetailOut,
+    SubtitleOut,
     TimelineOut,
+    VideoRenderOut,
 )
 from app.schemas.visual import (
     AssetOut,
@@ -25,7 +29,7 @@ from app.schemas.visual import (
     VisualPlanSegment,
 )
 from app.services.factory import get_script_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/scripts", tags=["scripts"])
 
@@ -79,7 +83,7 @@ def generate_script(
         db,
         current_user.id,
         JobType.SCRIPT,
-        idempotency_key=f"{current_user.id}:script:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.SCRIPT, f"script:{key}"),
         project_id=movie.project_id,
         input_payload={"movie_id": movie.id, "angle_id": payload.angle_id},
     )
@@ -156,6 +160,15 @@ def get_script_detail(
         if asset_ids
         else []
     )
+    renders = list(
+        db.scalars(select(VideoRender).where(VideoRender.script_id == script.id).order_by(VideoRender.id.desc()))
+    )
+    subtitles = list(
+        db.scalars(select(Subtitle).where(Subtitle.script_id == script.id).order_by(Subtitle.id.desc()))
+    )
+    qa_reports = list(
+        db.scalars(select(QAReport).where(QAReport.script_id == script.id).order_by(QAReport.gate))
+    )
 
     if script.visual_plan:
         visual_plan = VisualPlanMetadata(
@@ -200,4 +213,7 @@ def get_script_detail(
             )
             for r in reviews
         ],
+        renders=[VideoRenderOut.model_validate(r, from_attributes=True) for r in renders],
+        subtitles=[SubtitleOut.model_validate(s, from_attributes=True) for s in subtitles],
+        qa_reports=[QAReportOut.model_validate(q, from_attributes=True) for q in qa_reports],
     )

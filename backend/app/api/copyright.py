@@ -17,7 +17,7 @@ from app.schemas.visual import (
     CopyrightReviewOutput,
 )
 from app.services.factory import get_copyright_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/copyright", tags=["copyright"])
 
@@ -54,7 +54,7 @@ def evaluate_copyright(
         db,
         current_user.id,
         JobType.COPYRIGHT,
-        idempotency_key=f"{current_user.id}:copyright:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.COPYRIGHT, f"copyright:{key}"),
         project_id=project_id,
         input_payload={"script_id": script.id, "asset_ids": payload.asset_ids},
     )

@@ -18,7 +18,7 @@ from app.models.scripting import (
 from app.models.user import User
 from app.schemas.api import VoiceRequest, VoiceResult
 from app.services.factory import get_voice_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 
@@ -120,7 +120,7 @@ def generate_voice(
         db,
         current_user.id,
         JobType.VOICE,
-        idempotency_key=f"{current_user.id}:voice:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.VOICE, f"voice:{key}"),
         project_id=project_id,
         input_payload={"script_id": script.id, "voice_profile_id": profile.id, "speed": speed},
     )

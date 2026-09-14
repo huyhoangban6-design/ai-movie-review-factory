@@ -11,7 +11,7 @@ from app.models.user import User
 from app.schemas.api import VisualPlanRequest, VisualPlanResult
 from app.schemas.visual import VisualPlanMetadata
 from app.services.factory import get_visual_planner_provider
-from app.services.jobs import create_job, mark_job_failed, mark_job_success
+from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
 router = APIRouter(prefix="/visual", tags=["visual"])
 
@@ -29,7 +29,7 @@ def create_visual_plan(
         db,
         current_user.id,
         JobType.ASSETS,
-        idempotency_key=f"{current_user.id}:visualplan:{key}",
+        idempotency_key=next_attempt_key(db, current_user.id, JobType.ASSETS, f"visualplan:{key}"),
         project_id=project_id,
         input_payload={"script_id": script.id},
     )
