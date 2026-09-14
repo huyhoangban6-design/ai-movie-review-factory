@@ -9,7 +9,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 1 | Skeleton + DB + auth + dashboard | ✅ Hoàn tất (commit `7aedf8c`) |
 | 2 | Movie research → opportunity → angle | ✅ Hoàn tất (commit `85d7c4d`) |
 | 3 | Script → voice → timestamps | ✅ Hoàn tất (commit `ce7b366`) |
-| 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit TBD) |
+| 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit `ad904f0`) |
 | 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
 | 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
 | 7 | Analytics → experiments → learning | ⬜ Chưa bắt đầu |
@@ -101,4 +101,4 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 1. Copy `.env.example` → `.env`, đặt `SECRET_KEY` mạnh, điền provider keys nếu dùng provider thật.
 2. Cài Python 3.12 + Node 20, hoặc Docker.
 3. Chạy migration rồi khởi động theo README.
-4. Trên một movie, chạy đủ pipeline Phase 3 để kiểm tra: `/movies/research` → `/opportunities/score` → `/content/angles` → `/scripts/generate` → `/voice/generate` → `/timeline/build`, rồi xem `GET /movies/{id}` + `GET /scripts/{id}`.
+4. Trên một movie, chạy đủ pipeline Phase 4 để kiểm tra: `/movies/research` → `/opportunities/score` → `/content/angles` → `/scripts/generate` → `/voice/generate` → `/timeline/build` → `/visual/plan` → `/assets/generate` → `/copyright/evaluate`, rồi xem `GET /movies/{id}` + `GET /scripts/{id}`.
