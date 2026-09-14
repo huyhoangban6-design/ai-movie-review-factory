@@ -9,6 +9,7 @@ from app.models.base import BaseORM
 
 
 class JobType(str, enum.Enum):
+    MOVIE_DISCOVERY = "movie_discovery"
     MOVIE_RESEARCH = "movie_research"
     OPPORTUNITY_SCORE = "opportunity_score"
     CONTENT_ANGLE = "content_angle"

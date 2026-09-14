@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth'
 import AuthView from './views/AuthView'
 import DashboardView from './views/DashboardView'
+import MovieDetailView from './views/MovieDetailView'
 import ProjectDetailView from './views/ProjectDetailView'
 
 function Shell({ children }) {
@@ -46,6 +47,7 @@ export default function App() {
               <Routes>
                 <Route index element={<DashboardView />} />
                 <Route path="projects/:id" element={<ProjectDetailView />} />
+                <Route path="movies/:id" element={<MovieDetailView />} />
               </Routes>
             </Shell>
           </RequireAuth>

@@ -6,8 +6,8 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 0 | Docs thiết kế (00–15) | ✅ Hoàn tất |
-| 1 | Skeleton + DB + auth + dashboard | 🚧 Đang triển khai (xem bên dưới) |
-| 2 | Movie research → opportunity → angle | ⬜ Chưa bắt đầu |
+| 1 | Skeleton + DB + auth + dashboard | ✅ Hoàn tất (commit `7aedf8c`) |
+| 2 | Movie research → opportunity → angle | 🚧 Đang triển khai (xem bên dưới) |
 | 3 | Script → voice → timestamps | ⬜ Chưa bắt đầu |
 | 4 | Visual plan → assets → copyright gate | ⬜ Chưa bắt đầu |
 | 5 | FFmpeg render → subtitle → QA | ⬜ Chưa bắt đầu |
@@ -30,16 +30,40 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
   - Unit test nhỏ cho `format.js` (Vitest).
 - Docker: `docker-compose.yml` (postgres 16, redis 7, backend, migrate, frontend dev), Dockerfile backend + frontend (nginx), `nginx.conf` proxy `/api`.
 
+## Phase 2 — đã làm
+- Models mới (migration `20260914_0002`): `movies`, `movie_sources` (provenance/nguồn), `movies_analysis` (facts/themes), `opportunities` (overall + sub_scores + confidence + strategy_version), `content_angles` (CP1), `competitors` + `competitor_videos`.
+- Provider layer theo `docs/02` + `docs/05`:
+  - Interface `ResearchProvider` / `OpportunityProvider` / `AngleProvider`.
+  - Factory theo env (`RESEARCH_PROVIDER`/`OPPORTUNITY_PROVIDER`/`ANGLE_PROVIDER`), mặc định `offline` (không network, deterministic để test).
+  - Scoring dùng trọng số (được calibrate lại Phase 7), hàm `weighted_opportunity_score` thuần + test.
+- API mới (auth + tạo job theo dõi trạng thái):
+  - `POST /movies/research` → tạo `movies` + `movie_sources` + `movies_analysis` + job `movie_research`.
+  - `POST /opportunities/score` → upsert `opportunities` + job `opportunity_score`.
+  - `POST /content/angles` → replace `content_angles` (góc nội dung, CP1) + job `content_angle`.
+  - `GET /movies/{id}` → detail + sources + summaries + score + angles.
+  - `GET /jobs/{id}` truy vấn trạng thái job.
+- Job lifecycle đầy đủ: pending → succeeded/failed, có `idempotency_key`, `input_payload`, `output_summary`, `error_message`, `retry_count`. (Worker/queue Redis ghép nối Phase 8; hiện chạy đồng bộ trong request để dễ test.)
+- Frontend: form "Nghiên cứu phim" trên dashboard, `MovieDetailView` hiện điểm cơ hội + góc nội dung (CP1).
+- `create_project` không còn tạo job kickoff giả (nghiên cứu có endpoint riêng).
+
+## Phase 2 — còn thiếu / lưu ý
+- Provider thật (TMDB/web/LLM) chưa cắm — cần key ở `.env` (xem `.env.example`). Cấu trúc adapter đã sẵn sàng.
+- CP1 confirm (chọn/bỏ góc nội dung) chưa có UI — hiện mặc định giữ nguyên 6 góc đầu.
+- `competitors`/`competitor_videos` chưa được viết bởi endpoint (dự kiến Phase 7 nghiên cứu đối thủ qua analytics).
+- Vẫn chưa chạy được tests thật trong sandbox (thiếu pip/node) — cần chạy local.
+
 ## Phase 1 — còn thiếu / lưu ý
 - Môi trường sandbox hiện tại **không có pip/node/docker**, nên:
   - Backend mới được syntax-check bằng `compileall` (OK); **chưa chạy `pytest` hay import toàn app**.
   - Frontend chưa chạy `npm install` / `npm run build` / `vitest`.
   → Cần người dùng chạy local theo README (hoặc Docker) để xác nhận test pass.
 - Chưa có email verification, reset password (ngoài MVP Phase 1).
-- Worker/queue (Redis) mới là scaffold — job `movie_research` đang dừng ở trạng thái `pending` cho tới Phase 2/3.
+- Worker/queue (Redis) mới là scaffold — nghiên cứu/score/angles chạy đồng bộ trong request; job lưu trạng thái đầy đủ để worker Phase 8 nối sau.
 - Rate limit auth đang dùng bộ nhớ trong-memory (dự kiến chuyển Redis Phase 8).
+- Ghi chú: `create_project` không tạo job; job được tạo bởi research/score/angles endpoints.
 
 ## Manual setup cần người dùng
-1. Copy `.env.example` → `.env`, đặt `SECRET_KEY` mạnh.
+1. Copy `.env.example` → `.env`, đặt `SECRET_KEY` mạnh, điền provider keys nếu dùng provider thật.
 2. Cài Python 3.12 + Node 20, hoặc Docker.
 3. Chạy migration rồi khởi động theo README.
+4. Sau khi chạy `/movies/research` + `/opportunities/score` + `/content/angles`, kiểm tra `GET /movies/{id}` để xem kết quả.

@@ -11,15 +11,12 @@ def _create_project(client: TestClient, headers: dict, title: str = "My Movie Re
     return resp.json()
 
 
-def test_create_project_creates_kickoff_job(client: TestClient, auth_headers: dict) -> None:
+def test_create_project(client: TestClient, auth_headers: dict) -> None:
     data = _create_project(client, auth_headers)
     assert data["title"] == "My Movie Review"
     assert data["status"] == "draft"
     assert data["max_cost_per_video"] == 15.5
-    assert len(data["jobs"]) == 1
-    kickoff = data["jobs"][0]
-    assert kickoff["job_type"] == "movie_research"
-    assert kickoff["status"] == "pending"
+    assert data["jobs"] == []
 
 
 def test_create_project_requires_auth(client: TestClient) -> None:
@@ -41,7 +38,7 @@ def test_list_and_get_project(client: TestClient, auth_headers: dict) -> None:
     detail = client.get(f"/api/v1/projects/{created['id']}", headers=auth_headers)
     assert detail.status_code == 200
     assert detail.json()["id"] == created["id"]
-    assert len(detail.json()["jobs"]) >= 1
+    assert detail.json()["jobs"] == []
 
 
 def test_project_not_found_for_other_user(client: TestClient, auth_headers: dict) -> None:
@@ -65,17 +62,11 @@ def test_idempotent_project_creation(client: TestClient, auth_headers: dict) -> 
     )
     assert second.status_code == 201
     assert second.json()["id"] == first["id"]
-    assert len(second.json()["jobs"]) == 1
+    assert second.json()["jobs"] == []
 
 
 def test_get_job_and_jobs_list(client: TestClient, auth_headers: dict) -> None:
     project = _create_project(client, auth_headers, title="Jobs")
-    job = project["jobs"][0]
     via_detail = client.get(f"/api/v1/projects/{project['id']}/jobs", headers=auth_headers)
     assert via_detail.status_code == 200
-    assert via_detail.json()[0]["id"] == job["id"]
-
-    direct = client.get(f"/api/v1/jobs/{job['id']}", headers=auth_headers)
-    assert direct.status_code == 200
-    assert direct.json()["job_type"] == "movie_research"
-    assert direct.json()["idempotency_key"]
+    assert via_detail.json() == []

@@ -50,11 +50,18 @@ cd frontend && npm test                                  # frontend (vitest)
 - `POST /api/v1/auth/login` — lấy token
 - `GET  /api/v1/auth/me` — thông tin user
 - `GET  /api/v1/projects` — danh sách project
-- `POST /api/v1/projects` — tạo project (tự tạo job movie_research; hỗ trợ header `Idempotency-Key`)
+- `POST /api/v1/projects` — tạo project (hỗ trợ header `Idempotency-Key`)
 - `GET  /api/v1/projects/{id}` — chi tiết project + pipeline jobs
 - `GET  /api/v1/projects/{id}/jobs` — danh sách jobs
 - `GET  /api/v1/jobs/{id}` — trạng thái job
 - `GET  /health` — health check
+
+## API (Phase 2 — pipeline nghiên cứu)
+- `POST /api/v1/movies/research` — nghiên cứu phim (title + năm) → Movie, mặc định provider `offline`
+- `POST /api/v1/opportunities/score` — chấm điểm cơ hội (weighted) cho movie
+- `POST /api/v1/content/angles` — sinh góc nội dung (CP1), thay thế góc cũ của movie
+- `GET  /api/v1/movies/{id}` — chi tiết movie: sources, research, score, angles
+- Provider thật (TMDB/LLM/web search) cắm qua `.env`: `RESEARCH_PROVIDER`/`OPPORTUNITY_PROVIDER`/`ANGLE_PROVIDER` + keys
 
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.

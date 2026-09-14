@@ -5,10 +5,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.api.angles import router as angles_router
 from app.api.auth import router as auth_router
 from app.api.jobs import router as jobs_router
 from app.api.middleware import RateLimitMiddleware
+from app.api.movies import router as movies_router
+from app.api.opportunity import router as opportunity_router
 from app.api.projects import router as projects_router
+from app.api.research import router as research_router
 from app.core.config import settings
 from app.core.database import Base, engine
 
@@ -43,6 +47,10 @@ app.add_middleware(
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(projects_router, prefix=settings.api_v1_prefix)
 app.include_router(jobs_router, prefix=settings.api_v1_prefix)
+app.include_router(research_router, prefix=settings.api_v1_prefix)
+app.include_router(opportunity_router, prefix=settings.api_v1_prefix)
+app.include_router(angles_router, prefix=settings.api_v1_prefix)
+app.include_router(movies_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/health", tags=["system"])

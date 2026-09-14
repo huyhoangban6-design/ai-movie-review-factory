@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.job import JobStatus, JobType
+from app.schemas.research import Angle, MovieResearchOutput, OpportunityScoreOutput
 
 
 class UserOut(BaseModel):
@@ -87,3 +88,48 @@ class ProjectDetail(ProjectOut):
 
 class MessageOut(BaseModel):
     detail: str
+
+
+# ---------- Phase 2: research / opportunity / angles ----------
+class ResearchRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=255)
+    movie_id: int | None = Field(default=None)
+    year: int | None = Field(default=None, ge=1880, le=2100)
+    genres: list[str] = Field(default_factory=list)
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("title must not be blank")
+        return v
+
+
+class ResearchResult(ResearchRequest):
+    movie_id: int
+    output: MovieResearchOutput
+
+
+class ResearchJob(BaseModel):
+    job_id: int
+    options: dict = {}
+
+
+class ScoreRequest(BaseModel):
+    movie_id: int
+
+
+class ScoreResult(BaseModel):
+    job_id: int
+    opportunity_id: int
+    movie_id: int
+    score: OpportunityScoreOutput
+
+
+class AnglesResult(BaseModel):
+    job_id: int
+    movie_id: int
+    angles: list[Angle]

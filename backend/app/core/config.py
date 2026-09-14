@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     auth_rate_limit_per_minute: int = 30
     auth_rate_limit_window_seconds: int = 60
 
+    # ---- Phase 2: providers (interface/adapters) ----
+    # Mặc định "offline" = provider giả, không gọi network. Chuyển sang provider
+    # thật khi có key (bắt buộc config, tuyệt đối không hard-code key).
+    research_provider: str = "offline"
+    opportunity_provider: str = "offline"
+    angle_provider: str = "offline"
+    # Key cho provider thật (tùy chọn trong Phase 2; TMDB dùng định dạng API v3).
+    tmdb_api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

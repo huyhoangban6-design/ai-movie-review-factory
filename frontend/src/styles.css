@@ -382,6 +382,32 @@ textarea:focus {
   overflow-x: auto;
 }
 
+/* ---------- phase 2: research / score / angles ---------- */
+.score-big {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--primary);
+}
+
+.angle-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.angle-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.angle-item .strong {
+  font-size: 14.5px;
+}
+
 /* ---------- misc ---------- */
 @media (min-width: 640px) {
   .form-grid {

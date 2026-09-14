@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_idempotency_key
 from app.core.database import get_db
-from app.models.job import Job, JobStatus, JobType
+from app.models.job import Job
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.api import JobOut, ProjectCreate, ProjectDetail, ProjectOut
@@ -53,18 +53,6 @@ def create_project(
         max_cost_per_video=payload.max_cost_per_video,
     )
     db.add(project)
-    db.flush()
-
-    project.jobs = [
-        Job(
-            project_id=project.id,
-            owner_id=current_user.id,
-            job_type=JobType.MOVIE_RESEARCH,
-            status=JobStatus.PENDING,
-            idempotency_key=scope,
-            input_payload=payload.model_dump_json(),
-        )
-    ]
     db.commit()
     db.refresh(project)
     return project

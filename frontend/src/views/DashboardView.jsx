@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api'
 import { formatDate } from '../format'
 
 export default function DashboardView() {
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', maxCost: '' })
+  const [research, setResearch] = useState({ title: '', year: '' })
+  const [researching, setResearching] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -48,8 +51,61 @@ export default function DashboardView() {
     }
   }
 
+  async function onResearch(e) {
+    e.preventDefault()
+    setResearching(true)
+    setError('')
+    try {
+      const data = await apiFetch('/api/v1/movies/research', {
+        method: 'POST',
+        body: {
+          title: research.title.trim(),
+          year: research.year ? Number(research.year) : null,
+        },
+      })
+      setResearch({ title: '', year: '' })
+      navigate(`/movies/${data.movie_id}`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setResearching(false)
+    }
+  }
+
   return (
     <div className="page">
+      <section className="card">
+        <h2>Nghiên cứu phim mới</h2>
+        <form onSubmit={onResearch} className="form-grid">
+          <label>
+            Tên phim
+            <input
+              type="text"
+              value={research.title}
+              onChange={(e) => setResearch({ ...research, title: e.target.value })}
+              placeholder="VD: Interstellar"
+              required
+              minLength={2}
+            />
+          </label>
+          <label>
+            Năm sản xuất (không bắt buộc)
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1880"
+              max="2100"
+              value={research.year}
+              onChange={(e) => setResearch({ ...research, year: e.target.value })}
+              placeholder="VD: 2014"
+            />
+          </label>
+          <button className="btn btn-primary" type="submit" disabled={researching}>
+            {researching ? 'Đang nghiên cứu…' : 'Nghiên cứu'}
+          </button>
+        </form>
+      </section>
+
       <section className="card create-card">
         <h2>Project mới</h2>
         <form onSubmit={onSubmit} className="form-grid">
