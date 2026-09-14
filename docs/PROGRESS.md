@@ -76,7 +76,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - API mới (auth + job lifecycle):
   - `POST /visual/plan` → sinh visual plan từ script segments; lưu vào `scripts.visual_plan`, cập nhật `pipeline_status`.
   - `POST /assets/generate` / `POST /assets/search` → tạo asset theo visual plan; lưu `assets`, set `pipeline_status=assets`.
-  - `POST /copyright/evaluate` → đánh giá asset版权; lưu `copyright_reviews`, set `pipeline_status=copyright`, trả human_review_count + blocked_count.
+  - `POST /copyright/evaluate` → đánh giá bản quyền; lưu `copyright_reviews`, set `pipeline_status=copyright`, trả human_review_count + blocked_count.
   - `GET /scripts/{id}` mở rộng trả `visual_plan`, `assets`, `copyright_reviews`, `pipeline_status`.
 - Frontend `MovieDetailView`: thêm 3 nút pipeline (Phân plan → Tạo hình → Kiểm bản quyền), hiển thị visual plan segments + assets list + copyright risk badges.
 - Tests offline: visual plan mapping, asset generation + replacement, 3-second rule, commercial_use block, copyright ownership isolation.
@@ -97,8 +97,50 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Rate limit auth đang dùng bộ nhớ trong-memory (dự kiến chuyển Redis Phase 8).
 - Ghi chú: `create_project` không tạo job; job được tạo bởi research/score/angles endpoints.
 
-## Manual setup cần người dùng
-1. Copy `.env.example` → `.env`, đặt `SECRET_KEY` mạnh, điền provider keys nếu dùng provider thật.
-2. Cài Python 3.12 + Node 20, hoặc Docker.
-3. Chạy migration rồi khởi động theo README.
-4. Trên một movie, chạy đủ pipeline Phase 4 để kiểm tra: `/movies/research` → `/opportunities/score` → `/content/angles` → `/scripts/generate` → `/voice/generate` → `/timeline/build` → `/visual/plan` → `/assets/generate` → `/copyright/evaluate`, rồi xem `GET /movies/{id}` + `GET /scripts/{id}`.
+## Phase 4 — còn thiếu / lưu ý
+- Provider thật (DALL-E/Midjourney/Unsplash) chưa cắm — offline deterministic placeholder. Cấu trúc adapter đã sẵn sàng.
+- CP5 (chọn/reject asset) chưa có UI — hiện auto-generate toàn bộ.
+- Asset search offline chỉ trả CC0 placeholder; cần provider thật để tìm footage thực.
+- Vẫn chưa chạy tests thật trong sandbox — cần chạy local.
+
+## Kiểm tra static (Phase 4, sandbox 2026-09-14)
+| Kiểm tra | Kết quả |
+|---|---|
+| `python3 -m compileall` toàn bộ `backend/` | ✅ 0 lỗi (37 files) |
+| AST import trace — mỗi Phase 4 file import đúng symbol | ✅ All OK |
+| Topological sort module graph (37 modules) | ✅ Acyclic, no circular imports |
+| Migration chain 0001→0002→0003→0004 linear | ✅ Clean |
+| Migration 0004 columns vs model definitions | ✅ Match (assets: 18 cols, asset_sources: 7 cols, copyright_reviews: 7 cols, scripts add: visual_plan + pipeline_status) |
+| `alembic/env.py` imports `Base` → metadata includes new tables | ✅ |
+| `requirements.txt` deps sufficient (pydantic, sqlalchemy, alembic, pytest, httpx) | ✅ No new deps needed |
+| `main.py` router registration: 13 routers all included | ✅ |
+| Frontend JSX bracket balance + handler definitions | ✅ 398 opens = 398 closes, 3 handlers defined |
+| `config.py` settings: visual_provider, asset_provider, copyright_provider, asset_source_hint | ✅ |
+| `schemas/api.py` ↔ `schemas/visual.py` no circular import | ✅ |
+| `CopyrightReviewOutput` field types consistent between providers, routers, detail response | ✅ |
+
+## Chưa kiểm tra được (cần chạy local)
+- `pytest tests/test_phase4.py` — cần SQLite + sqlalchemy install
+- `alembic upgrade head` — cần PostgreSQL hoặc SQLite
+- `npm run build` — cần Node.js 20
+- Import toàn app (`from app.main import app`) — cần Python 3.12 + deps
+
+## Lệnh cần chạy trên máy local
+```bash
+# 1. Backend — install deps + migrate + test
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp ../.env.example ../.env           # chỉnh SECRET_KEY, DATABASE_URL nếu cần
+mkdir -p data                        # SQLite fallback
+alembic upgrade head                 # chạy migration 0001→0004
+pytest tests/test_phase4.py -v      # chạy 10 tests Phase 4
+
+# 2. Backend — chạy server kiểm tra API
+python run.py                        # http://localhost:8000/docs
+
+# 3. Frontend — install + build
+cd frontend
+npm install
+npm run dev                          # http://localhost:5173
+```

@@ -156,7 +156,6 @@ def get_script_detail(
         if asset_ids
         else []
     )
-    review_map: dict[int, CopyrightReview] = {r.asset_id: r for r in reviews}
 
     if script.visual_plan:
         visual_plan = VisualPlanMetadata(
