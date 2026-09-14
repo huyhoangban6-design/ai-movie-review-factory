@@ -1,0 +1,18 @@
+{
+  "name": "AI Movie Review Factory",
+  "short_name": "MovieFactory",
+  "description": "Phone-first dashboard cho vận hành kênh YouTube review phim bằng AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/manifest-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.api.auth import router as auth_router
+from app.api.jobs import router as jobs_router
+from app.api.middleware import RateLimitMiddleware
+from app.api.projects import router as projects_router
+from app.core.config import settings
+from app.core.database import Base, engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_app_route_paths = tuple(
+    f"{settings.api_v1_prefix}{p}"
+    for p in ("/auth/register", "/auth/login")
+)
+app.add_middleware(
+    RateLimitMiddleware,
+    limit=settings.auth_rate_limit_per_minute,
+    window_seconds=settings.auth_rate_limit_window_seconds,
+    paths=_app_route_paths,
+)
+
+app.include_router(auth_router, prefix=settings.api_v1_prefix)
+app.include_router(projects_router, prefix=settings.api_v1_prefix)
+app.include_router(jobs_router, prefix=settings.api_v1_prefix)
+
+
+@app.get("/health", tags=["system"])
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": settings.app_name}
+
+
+_frontend_dist = Path(settings.frontend_dist_path)
+if _frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")

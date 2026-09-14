@@ -1,0 +1,45 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user
+from app.core.database import get_db
+from app.core.security import create_access_token, hash_password, verify_password
+from app.models.user import User
+from app.schemas.api import LoginRequest, RegisterRequest, TokenOut, UserOut
+
+router = APIRouter(tags=["auth"])
+
+
+@router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenOut:
+    existing = db.scalar(select(User).where(User.email == payload.email))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    user = User(
+        email=payload.email,
+        display_name=payload.display_name,
+        hashed_password=hash_password(payload.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return TokenOut(access_token=create_access_token(user.id))
+
+
+@router.post("/login", response_model=TokenOut)
+def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)) -> TokenOut:
+    user = db.scalar(select(User).where(User.email == form.username))
+    if user is None or not verify_password(form.password, user.hashed_password) or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return TokenOut(access_token=create_access_token(user.id))
+
+
+@router.get("/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
