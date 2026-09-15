@@ -12,7 +12,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit `ad904f0`) |
 | 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
 | 6 | YouTube private upload → approval → publish | ✅ Hoàn tất (commit `0c161f3`) |
-| 7 | Analytics → experiments → learning | ✅ Hoàn tất |
+| 7 | Analytics → experiments → learning | ✅ Hoàn tất (commit `fc01954`) |
 | 8 | Cost engine + fallback + production hardening | ⬜ Chưa bắt đầu |
 
 ## Phase 1 — đã làm
