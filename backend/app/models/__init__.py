@@ -1,6 +1,7 @@
 from app.models.analytics import AnalyticsInsight, Experiment, KPISnapshot, YouTubeMetric
 from app.models.base import Base
 from app.models.assets import Asset, AssetSource, CopyrightReview, RiskLevel
+from app.models.cost import CostMode, CostRecord, CostRecordStatus, SystemLog
 from app.models.job import Job
 from app.models.media_source import MediaSource
 from app.models.movie import (
@@ -38,6 +39,9 @@ __all__ = [
     "CompetitorVideo",
     "ContentAngle",
     "CopyrightReview",
+    "CostMode",
+    "CostRecord",
+    "CostRecordStatus",
     "Experiment",
     "Job",
     "KPISnapshot",
@@ -59,6 +63,7 @@ __all__ = [
     "ScriptStatus",
     "ScriptTimeline",
     "Subtitle",
+    "SystemLog",
     "User",
     "VideoRender",
     "VoiceGeneration",

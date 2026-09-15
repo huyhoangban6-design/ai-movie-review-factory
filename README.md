@@ -97,6 +97,18 @@ cd frontend && npm test                                  # frontend (vitest)
 - `GET/POST /api/v1/analytics/experiments` + `POST /api/v1/analytics/experiments/{id}/activate` — calibrate trọng số, kích hoạt cho scoring
 - Provider cắm qua `.env`: `ANALYTICS_PROVIDER` (mặc định `offline`, deterministic sample)
 
+## API (Phase 8 — cost engine, budget, hardening)
+- `POST /api/v1/cost/estimate` — ước tính chi phí trước job (mode `free|balanced|premium`, theo provider/model/units)
+- `GET  /api/v1/projects/{id}/cost` — tổng quan chi phí + ngân sách của project (tổng thực/ước, còn lại, % dùng, theo provider/category, alerts)
+- `PATCH /api/v1/projects/{id}/budget` — đổi `max_cost_per_video` + `cost_mode`
+- `POST /api/v1/cost/records` + `GET /api/v1/cost/records?project_id=` — ghi/lọc chi phí (hoá đơn provider thật / pipeline)
+- `GET  /api/v1/cost/alerts` — cảnh báo ngân sách gần đây
+- Budget gate: pre-job ước tính > `max_cost_per_video` → `402 Payment Required` (cần duyệt/nâng budget)
+- Fallback + circuit breaker: voice/render tự retry rồi fallback offline; mọi provider thất bại → `503`
+- Cấu hình qua `.env`: `COST_MODE_DEFAULT`, `MAX_RETRIES_DEFAULT`, `CIRCUIT_BREAKER_THRESHOLD`, `COST_RATE_*` (xem `.env.example`)
+
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.
 - `Idempotency-Key` giúp retry an toàn (job không chạy trùng).
+- Mọi provider thật phải cấu hình credential trong `.env`; startup cảnh báo nếu thiếu. Dev-only `SECRET_KEY` bị flag khi khởi động.
+- HTTP response có `X-Request-Id` (tracing) + security headers.

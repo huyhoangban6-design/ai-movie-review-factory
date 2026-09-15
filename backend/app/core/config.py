@@ -69,6 +69,29 @@ class Settings(BaseSettings):
     analytics_provider: str = "offline"
     # Provider thật (YouTube Analytics API) sẽ dùng chung credential YouTube ở trên.
 
+    # ---- Phase 8: cost engine (docs/11) ----
+    # Mode mặc định khi tạo project (free / balanced / premium) — multiplier scaling.
+    cost_mode_default: str = "balanced"
+    # Mức cảnh báo khi chi phí đã dùng vượt ngưỡng % của max_cost_per_video.
+    cost_alert_threshold_pct: float = 0.8
+    # Rate mặc định (USD) — offline darling an toàn; cho phép đè qua env khi có provider thật.
+    cost_rate_voice_per_1k_chars: float = 0.0001
+    cost_rate_render_per_minute: float = 0.001
+
+    # ---- Phase 8: fallback + retry + circuit breaker ----
+    max_retries_default: int = 3
+    retry_backoff_base_seconds: float = 2.0
+    retry_backoff_max_seconds: float = 60.0
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_reset_seconds: float = 60.0
+    request_timeout_seconds: int = 30
+
+    # ---- Phase 8: production hardening / observability ----
+    # Redis dùng cho queue/worker + rate limit + cache (Phase 8; chưa bắt buộc khi offline).
+    redis_url: str = "redis://localhost:6379/0"
+    log_level: str = "INFO"
+    request_id_header: str = "x-request-id"
+
 
 @lru_cache
 def get_settings() -> Settings:

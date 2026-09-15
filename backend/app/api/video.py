@@ -26,8 +26,11 @@ from app.schemas.render import (
     SubtitleRequest,
     SubtitleResult,
 )
+from app.services.cost import check_budget, record_job_cost
 from app.services.factory import get_qa_provider, get_render_provider, get_subtitle_provider
+from app.services.fallback import ProviderUnavailableError, run_with_fallback
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
+from app.services.providers import OfflineRenderProvider
 
 router = APIRouter(prefix="/video", tags=["video"])
 
@@ -79,6 +82,11 @@ def render_video(
         )
 
     key = hashlib.sha256(f"{script.id}|render|{generation.id}".encode()).hexdigest()[:24]
+
+    # Phase 8 cost engine: pre-job estimate theo minutes render + budget gate.
+    render_minutes = float(generation.audio_duration_s or 0.0) / 60.0
+    check_budget(db, project_id, units=render_minutes, job_type=JobType.RENDER)
+
     job = create_job(
         db,
         current_user.id,
@@ -89,8 +97,22 @@ def render_video(
     )
 
     try:
-        provider = get_render_provider()
-        output = provider.render(script.id, generation.audio_url, float(generation.audio_duration_s))
+        # Phase 8 fallback: primary render provider retried, fallback = offline render.
+        output = run_with_fallback(
+            lambda: get_render_provider().render(script.id, generation.audio_url, float(generation.audio_duration_s)),
+            fallbacks=(
+                lambda: OfflineRenderProvider().render(
+                    script.id, generation.audio_url, float(generation.audio_duration_s)
+                ),
+            ),
+            provider_name="render",
+            max_retries=2,
+            sleep=lambda _: None,
+        )
+    except ProviderUnavailableError as exc:
+        mark_job_failed(db, job, str(exc))
+        db.commit()
+        raise HTTPException(status_code=503, detail=f"Render provider unavailable: {exc}") from exc
     except Exception as e:  # noqa: BLE001
         mark_job_failed(db, job, str(e))
         db.commit()
@@ -111,7 +133,7 @@ def render_video(
         duration_s=output.duration_s,
         file_size_bytes=output.file_size_bytes,
         render_config={
-            "provider": provider.name,
+            "provider": "offline",
             "resolution": output.resolution,
             "fps": output.fps,
             "video_codec": output.video_codec,
@@ -126,6 +148,7 @@ def render_video(
     db.flush()
 
     mark_job_success(db, job, output.model_dump())
+    record_job_cost(db, job, provider="offline", units=render_minutes if render_minutes > 0 else 1.0)
     db.commit()
 
     return RenderResult(job_id=job.id, render_id=render.id, script_id=script.id, render=output)

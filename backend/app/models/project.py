@@ -16,6 +16,7 @@ class Project(BaseORM):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="draft", nullable=False)
     max_cost_per_video: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    cost_mode: Mapped[str] = mapped_column(String(16), default="balanced", nullable=False)
 
     owner: Mapped["User"] = relationship()  # pyright: ignore
     jobs: Mapped[list["Job"]] = relationship(

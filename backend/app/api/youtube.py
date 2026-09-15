@@ -23,6 +23,7 @@ from app.schemas.publishing import (
     UploadRequest,
     UploadResult,
 )
+from app.services.cost import check_budget, record_job_cost
 from app.services.factory import get_publishing_provider
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
@@ -79,6 +80,9 @@ def upload_to_youtube(
 
     title = (payload.title or "").strip() or script.title
 
+    # Phase 8 cost engine: budget gate trước khi upload (publishing tốn chi phí provider thật).
+    check_budget(db, project_id, units=1.0, job_type=JobType.UPLOAD)
+
     key = hashlib.sha256(f"{script.id}|upload|{render.id}|{title}".encode()).hexdigest()[:24]
     job = create_job(
         db,
@@ -127,6 +131,7 @@ def upload_to_youtube(
     db.flush()
 
     mark_job_success(db, job, output)
+    record_job_cost(db, job, provider=provider.name, units=1.0)
     db.commit()
 
     return UploadResult(job_id=job.id, publication_id=publication.id, script_id=script.id, upload=output)
@@ -176,6 +181,9 @@ def publish_video(
         )
     script, project_id = load_script_for_owner(db, publication.script_id, current_user.id)
 
+    # Phase 8 cost engine: budget gate trước khi publish.
+    check_budget(db, publication.project_id or project_id, units=1.0, job_type=JobType.PUBLISH)
+
     key = hashlib.sha256(f"{publication.id}|publish|seed".encode()).hexdigest()[:24]
     job = create_job(
         db,
@@ -212,6 +220,7 @@ def publish_video(
     db.flush()
 
     mark_job_success(db, job, output)
+    record_job_cost(db, job, provider=provider.name, units=1.0)
     db.commit()
 
     return PublishResult(job_id=job.id, publication_id=publication.id, script_id=script.id, publish=output)

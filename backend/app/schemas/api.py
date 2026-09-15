@@ -51,6 +51,7 @@ class ProjectCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
     max_cost_per_video: float | None = Field(default=None, gt=0, le=1_000_000)
+    cost_mode: str = Field(default="balanced", pattern="^(free|balanced|premium)$")
 
     @field_validator("title")
     @classmethod
@@ -69,6 +70,10 @@ class JobOut(BaseModel):
     job_type: JobType
     status: JobStatus
     retry_count: int
+    max_retries: int | None
+    next_retry_at: datetime | None
+    provider_name: str | None
+    cost_usd: float | None
     input_payload: str | None
     output_summary: str | None
     error_message: str | None
@@ -87,6 +92,7 @@ class ProjectOut(BaseModel):
     description: str | None
     status: str
     max_cost_per_video: float | None
+    cost_mode: str
     owner_id: int
     created_at: datetime
     updated_at: datetime

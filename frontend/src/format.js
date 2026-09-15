@@ -31,6 +31,14 @@ export function formatPercent(value) {
   return `${value.toFixed(1)}%`
 }
 
+export function formatUsd(value) {
+  if (value == null || Number.isNaN(value)) return '—'
+  if (value === 0) return '$0.00'
+  if (value >= 1000) return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  if (value >= 0.01) return `$${value.toFixed(2)}`
+  return `$${value.toFixed(6)}`
+}
+
 export const SCRIPT_SECTION_LABEL = {
   hook: 'Hook (mở hấp dẫn)',
   thesis: 'Luận điểm chính',
@@ -61,6 +69,7 @@ export const JOB_TYPE_LABEL = {
   assets: 'Assets',
   copyright: 'Bản quyền',
   render: 'Render',
+  subtitle: 'Phụ đề',
   qa: 'QA',
   upload: 'Upload',
   publish: 'Xuất bản',

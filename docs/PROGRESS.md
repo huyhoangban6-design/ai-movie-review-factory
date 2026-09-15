@@ -13,7 +13,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
 | 6 | YouTube private upload → approval → publish | ✅ Hoàn tất (commit `0c161f3`) |
 | 7 | Analytics → experiments → learning | ✅ Hoàn tất (commit `fc01954`) |
-| 8 | Cost engine + fallback + production hardening | ⬜ Chưa bắt đầu |
+| 8 | Cost engine + fallback + production hardening | ✅ Hoàn tất (commit `…`) |
 
 ## Phase 1 — đã làm
 - Skeleton thư mục theo docs/02 (`backend/`, `frontend/`, `docs/`).
@@ -156,6 +156,26 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - Migration checks: `alembic upgrade head` 0001→0007 trên SQLite mới + `downgrade base` + `upgrade head` lại — đều sạch.
 - Đổi tên cột `metadata` → `data` trong model/migration (collide với SQLAlchemy declarative reserved).
 
+## Phase 8 — đã làm (Cost engine + fallback + production hardening, docs/11 + docs/03)
+- Models mới (migration `20260915_0008`): `cost_records` (owner/project/job, job_type, provider, model, mode, category, unit/units/unit_rate_usd, estimated/actual cost_usd, currency, status estimated|recorded|adjusted, notes; index owner/project/job/job_type), `system_logs` (level/logger/event/message/details/request_id/occurred_at — cost alerts, provider failures). Thêm cột: `projects.cost_mode` (free|balanced|premium, default balanced), `jobs.cost_usd` + `jobs.provider_name` + `jobs.max_retries` + `jobs.next_retry_at`.
+- Cost engine (docs/11): `services/cost.py` — `COST_MODE_MULTIPLIER` free=0.5 / balanced=1.0 / premium=1.5; `DEFAULT_RATES` đủ 17 JobType (voice theo ký tự, render theo phút, asset theo cái…) với default offline an toàn, đè qua env `COST_RATE_VOICE_PER_1K_CHARS`/`COST_RATE_RENDER_PER_MINUTE`; `estimate_cost`, `check_budget` (pre-job: estimate > max_cost_per_video → **402 Payment Required** "cần duyệt"; cảnh báo khi ≥80% ngân sách → system_log budget_alert), `record_cost`/`record_job_cost` (đọc cost_mode từ project, set `job.cost_usd`+`provider_name`), `project_cost_summary` (tổng thực/ước tính, còn lại, % dùng, theo category/provider, alerts, records gần nhất), `total_actual_cost`, `recent_cost_alerts`.
+- Fallback + retry + circuit breaker (`services/fallback.py`): `circuit_*` in-memory (threshold + reset window, state closed/open/half_open), `run_with_fallback(primary, fallbacks, …)` retry primary có exponential backoff (inject `sleep` để test không đợi), fallback mỗi provider 1 lần → thất bại toàn bộ → `ProviderUnavailableError` → **503** + circuit. Gắn fallback vào voice (→ OfflineVoiceProvider) và render (→ OfflineRenderProvider).
+- Job hardening (`services/jobs.py`): `create_job` set `max_retries` từ settings; `mark_job_success/failed` set `completed_at`; `mark_job_running` (RUNNING + started_at); `mark_job_retry_pending` (PENDING + retry_count+1 + next_retry_at theo backoff); `should_retry` (FAILED và dưới cap); `get_retry_delay` (exponential, cap).
+- API mới (`api/cost.py`, auth + ownership isolation → 404 cho user khác):
+  - `POST /cost/estimate` (ước tính trước job theo mode/provider/model/units), `POST /cost/records` + `GET /cost/records?project_id=` (ghi/lọc chi phí), `GET /cost/alerts` (budget alert gần đây).
+  - `GET /projects/{id}/cost` (tổng quan budget + chi phí), `PATCH /projects/{id}/budget` (đổi max_cost_per_video + cost_mode).
+- Wire cost + budget gate vào các cost-center: `voice/generate` (units=chars + fallback), `video/render` (units=minutes + fallback), `assets/search`+`assets/generate` (units=assets), `youtube/upload` + `youtube/publish` (budget gate + record), `analytics/video/{id}/refresh`. Ghi cost cho mọi job qua `record_job_cost` ngay trước commit.
+- Production hardening (docs/00 #8, docs/03 system_logs): middleware `RequestContextMiddleware` (request_id qua `X-Request-Id` truyền sẵn hoặc uuid, response header, security headers X-Content-Type-Options/X-Frame-Options/Referrer-Policy, structured request log); `RateLimitMiddleware` nhận log warning khi 429; exception handler 503 `ProviderUnavailableError` + 500 generic kèm request_id; startup `warn_on_runtime_problems()` — cảnh báo provider thật thiếu credential (TMDB/YouTube), provider chưa có adapter chỉ nhận `offline`, cost_mode/threshold sai, SECRET_KEY mặc định.
+- Frontend: `ProjectDetailView` thêm card "Chi phí & ngân sách" — tổng chi tiêu USD, ngân sách còn lại, % đã dùng + progress bar, theo provider/category, cảnh báo budget, form lưu ngân sách + cost_mode (gọi `PATCH /projects/{id}/budget`); `formatUsd` (nhiều mức độ chính xác) + nhãn `subtitle`; styles mới.
+- Tests (25 mới, tổng 96): `tests/test_phase8.py` — estimate theo mode multiplier + rate voice/render + 422 job_type lạ; budget gate 402 khi vượt / ≤ ngân sách ok / no-limit; summary + records + PATCH budget + alerts; ownership isolation 404; fallback retry-then-fallback / all-fail / circuit mở từ chối / circuit đóng lại khi success; backoff cap; job retry lifecycle (running→failed→requeue→succeeded, should_retry); voice pipeline ghi đủ cost voice/render/assets/upload/publish/analytics + job.cost_usd/provider_name/max_retries; voice 503 khi mọi provider fail + job bị mark failed; config validation (SECRET_KEY dev, provider thiếu credential, cost_mode sai); request_id + security headers.
+- Migration checks: `alembic upgrade head` 0001→0008 + `downgrade base` (batch drop columns SQLite) + `upgrade head` lại — sạch.
+
+## Phase 8 — còn thiếu / lưu ý
+- Cost rate thật là config hằng số (default offline safe); khi gắn provider thật cần kéo pricing động vào `get_unit_rate` (voice/render đã có env override).
+- Circuit breaker in-memory → mất trạng thái khi restart; production nên chuyển sang Redis (đã có `REDIS_URL` sẵn cho queue/rate limit).
+- `run_with_fallback` gắn mới ở voice + render; các provider còn lại (research/script/…) chưa có fallback chain — pattern sẵn sàng để mở rộng cùng provider thật.
+- Scheduler auto-publish theo `publish_at` + cron snapshot analytics vẫn để gắn worker/queue (Redis) về sau.
+
 ## Phase 6 — còn thiếu / lưu ý
 - Provider thật (YouTube Data API v3 — OAuth, upload video bytes, set thumbnail, check Content ID) chưa cắm: `YOUTUBE_PROVIDER=offline` giả lập (xem `.env.example`).
 - UI chỉ hỗ trợ approval đơn giản (note text); chưa có luồng "kiểm tra sau upload Private" (metadata/thumbnail/audio) như mô tả docs/13 — nằm ở provider thật.
@@ -172,13 +192,14 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 ## Kiểm tra test thật (sandbox 2026-09-15)
 | Kiểm tra | Kết quả |
 |---|---|
-| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5 + phase6 + phase7) | ✅ 71 passed |
-| `tests/test_phase7.py` (analytics/metrics/experiments/learning) | ✅ 13 passed |
-| Import toàn app `from app.main import app` + routes `/api/v1/analytics/*` (12 routes) | ✅ |
-| `alembic upgrade head` trên SQLite mới (0001→0007) | ✅ Clean (cột `data` thay `metadata` do reserved) |
-| `alembic downgrade base` + `upgrade head` lại (0007) | ✅ Clean |
-| Frontend `npm test` (vitest format) | ✅ 5 passed (Node 20.18.3) |
-| Frontend `npm run build` (vite production) | ✅ Built (~192 KB js) |
+| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5 + phase6 + phase7 + phase8) | ✅ 96 passed |
+| `tests/test_phase8.py` (cost engine/budget/fallback/circuit/retry/hardening/isolation/config) | ✅ 25 passed |
+| Import toàn app `from app.main import app` + routes `/api/v1/*` (bao gồm `/cost/estimate`, `/cost/records`, `/cost/alerts`, `/projects/{id}/cost`, `/projects/{id}/budget`) | ✅ |
+| `alembic upgrade head` trên SQLite mới (0001→0008) | ✅ Clean |
+| `alembic downgrade base` + `upgrade head` lại (0008, batch drop columns) | ✅ Clean |
+| `python3 -m compileall backend/app` | ✅ 0 lỗi |
+| Frontend `npm test` (vitest format) | ✅ 6 passed (Node 20.18.3) |
+| Frontend `npm run build` (vite production) | ✅ Built (~204 KB js) |
 
 ## Kiểm tra static (Phase 4, sandbox 2026-09-14)
 | Kiểm tra | Kết quả |

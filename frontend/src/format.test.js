@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatNumber, formatPercent, STATUS_LABEL, JOB_TYPE_LABEL } from './format'
+import { formatDate, formatNumber, formatPercent, formatUsd, STATUS_LABEL, JOB_TYPE_LABEL } from './format'
 
 describe('format', () => {
   it('trả về placeholder khi thiếu giá trị', () => {
@@ -8,6 +8,14 @@ describe('format', () => {
     expect(formatNumber(null)).toBe('—')
     expect(formatNumber(Number.NaN)).toBe('—')
     expect(formatPercent(null)).toBe('—')
+    expect(formatUsd(null)).toBe('—')
+  })
+
+  it('định dạng USD nhiều cấp độ', () => {
+    expect(formatUsd(0)).toBe('$0.00')
+    expect(formatUsd(1234.5)).toBe('$1,234.50')
+    expect(formatUsd(0.5)).toBe('$0.50')
+    expect(formatUsd(0.004)).toBe('$0.004000')
   })
 
   it('định dạng số comp/compact', () => {

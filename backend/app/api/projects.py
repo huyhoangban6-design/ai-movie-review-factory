@@ -50,6 +50,7 @@ def create_project(
         title=payload.title,
         description=payload.description,
         max_cost_per_video=payload.max_cost_per_video,
+        cost_mode=payload.cost_mode,
     )
     db.add(project)
     db.commit()

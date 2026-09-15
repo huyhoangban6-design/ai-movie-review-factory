@@ -33,6 +33,7 @@ from app.schemas.analytics import (
     VideoMetricsResult,
     VideoMetricsOutput,
 )
+from app.services.cost import record_job_cost
 from app.services.factory import get_analytics_provider
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 from app.services.strategy import get_active_strategy
@@ -199,6 +200,7 @@ def refresh_video_metrics(
     _write_kpi_snapshot(db, current_user.id)
 
     mark_job_success(db, job, output)
+    record_job_cost(db, job, provider=provider.name, units=1.0)
     db.commit()
 
     return VideoMetricsResult(

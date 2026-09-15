@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum as SAEnum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseORM
@@ -51,8 +51,12 @@ class Job(BaseORM):
     output_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_retries: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    cost_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="jobs")  # pyright: ignore

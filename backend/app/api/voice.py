@@ -17,8 +17,11 @@ from app.models.scripting import (
 )
 from app.models.user import User
 from app.schemas.api import VoiceRequest, VoiceResult
+from app.services.cost import check_budget, record_job_cost
 from app.services.factory import get_voice_provider
+from app.services.fallback import ProviderUnavailableError, run_with_fallback
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
+from app.services.providers import OfflineVoiceProvider
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 
@@ -113,6 +116,16 @@ def generate_voice(
         )
 
     text = "\n".join(seg.text for seg in script.segments)
+
+    # Phase 8 cost engine (docs/11): pre-job estimate + budget gate (402 khi vượt).
+    check_budget(
+        db,
+        project_id,
+        units=float(len(text)),
+        job_type=JobType.VOICE,
+        provider=profile.provider,
+    )
+
     key = hashlib.sha256(
         f"{script.id}|{profile.id}|{speed}".encode()
     ).hexdigest()[:24]
@@ -125,9 +138,8 @@ def generate_voice(
         input_payload={"script_id": script.id, "voice_profile_id": profile.id, "speed": speed},
     )
 
-    try:
-        provider = get_voice_provider()
-        output = provider.synthesize(
+    def _synthesize(provider):
+        return provider.synthesize(
             text,
             provider=profile.provider,
             model=profile.model,
@@ -138,6 +150,20 @@ def generate_voice(
             license_url=profile.license_url,
             cloning_permission=profile.cloning_permission,
         )
+
+    try:
+        # Phase 8 fallback (docs/11): primary retry + backoff, fallback offline provider.
+        output = run_with_fallback(
+            lambda: _synthesize(get_voice_provider()),
+            fallbacks=(lambda: _synthesize(OfflineVoiceProvider()),),
+            provider_name="voice",
+            max_retries=2,
+            sleep=lambda _: None,
+        )
+    except ProviderUnavailableError as exc:
+        mark_job_failed(db, job, str(exc))
+        db.commit()
+        raise HTTPException(status_code=503, detail=f"Voice provider unavailable: {exc}") from exc
     except Exception as e:  # noqa: BLE001
         mark_job_failed(db, job, str(e))
         db.commit()
@@ -167,6 +193,7 @@ def generate_voice(
     gen_id = generation.id
 
     mark_job_success(db, job, output.model_dump())
+    record_job_cost(db, job, provider=output.provider or "offline", model=output.model, units=float(len(text)))
     db.commit()
 
     return VoiceResult(

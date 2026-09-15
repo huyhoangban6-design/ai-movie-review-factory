@@ -24,6 +24,7 @@ from app.schemas.visual import (
     VisualPlanMetadata,
     VisualPlanSegment,
 )
+from app.services.cost import check_budget, record_job_cost
 from app.services.factory import get_asset_provider
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
 
@@ -99,6 +100,10 @@ def search_assets(
 ) -> AssetSearchRequestOut:
     script, project_id = load_script_for_owner(db, payload.script_id, current_user.id)
 
+    # Phase 8 cost engine: ước tính theo số segment asset sẽ tạo + budget gate.
+    estimated_assets = len(script.visual_plan or []) or 1
+    check_budget(db, project_id, units=float(estimated_assets), job_type=JobType.ASSETS)
+
     key = hashlib.sha256(f"{script.id}|stock|{payload.segment_index}".encode()).hexdigest()[:24]
     job = create_job(
         db,
@@ -121,6 +126,7 @@ def search_assets(
         raise HTTPException(status_code=500, detail=f"Asset search failed: {e}")
 
     mark_job_success(db, job, result.model_dump())
+    record_job_cost(db, job, provider="offline", units=float(result.assets_created))
     db.commit()
     return AssetSearchRequestOut(script_id=script.id, result=result)
 
@@ -132,6 +138,10 @@ def generate_assets(
     current_user: User = Depends(get_current_user),
 ) -> AssetGenerateResult:
     script, project_id = load_script_for_owner(db, payload.script_id, current_user.id)
+
+    # Phase 8 cost engine: ước tính theo số segment asset sẽ tạo + budget gate.
+    estimated_assets = len(script.visual_plan or []) or 1
+    check_budget(db, project_id, units=float(estimated_assets), job_type=JobType.ASSETS)
 
     key = hashlib.sha256(f"{script.id}|gen|{payload.segment_index}".encode()).hexdigest()[:24]
     job = create_job(
@@ -155,5 +165,6 @@ def generate_assets(
         raise HTTPException(status_code=500, detail=f"Asset generation failed: {e}")
 
     mark_job_success(db, job, result.model_dump())
+    record_job_cost(db, job, provider="offline", units=float(result.assets_created))
     db.commit()
     return AssetGenerateResult(job_id=job.id, script_id=script.id, result=result)
