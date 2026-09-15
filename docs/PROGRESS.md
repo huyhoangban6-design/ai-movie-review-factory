@@ -13,7 +13,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
 | 6 | YouTube private upload → approval → publish | ✅ Hoàn tất (commit `0c161f3`) |
 | 7 | Analytics → experiments → learning | ✅ Hoàn tất (commit `fc01954`) |
-| 8 | Cost engine + fallback + production hardening | ✅ Hoàn tất (commit `…`) |
+| 8 | Cost engine + fallback + production hardening | ✅ Hoàn tất (commit `0932176`) |
 
 ## Phase 1 — đã làm
 - Skeleton thư mục theo docs/02 (`backend/`, `frontend/`, `docs/`).
