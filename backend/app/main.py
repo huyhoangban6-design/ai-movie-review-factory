@@ -20,6 +20,7 @@ from app.api.timeline import router as timeline_router
 from app.api.visual import router as visual_router
 from app.api.voice import router as voice_router
 from app.api.video import router as video_router
+from app.api.youtube import router as youtube_router
 from app.core.config import settings
 from app.core.database import Base, engine
 
@@ -65,6 +66,7 @@ app.include_router(visual_router, prefix=settings.api_v1_prefix)
 app.include_router(assets_router, prefix=settings.api_v1_prefix)
 app.include_router(copyright_router, prefix=settings.api_v1_prefix)
 app.include_router(video_router, prefix=settings.api_v1_prefix)
+app.include_router(youtube_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/health", tags=["system"])

@@ -77,6 +77,13 @@ cd frontend && npm test                                  # frontend (vitest)
 - `POST /api/v1/copyright/evaluate` — đánh giá bản quyền: 3-second rule, commercial_use gate, risk scoring
 - Provider cắm qua `.env`: `VISUAL_PROVIDER`/`ASSET_PROVIDER`/`COPYRIGHT_PROVIDER` + `ASSET_SOURCE_HINT`
 
+## API (Phase 6 — YouTube private upload → approval → publish)
+- `POST /api/v1/youtube/upload` — upload Private (precondition: Final QA pass + render + subtitle)
+- `POST /api/v1/youtube/approve` — checkpoint CP6: `approved=true` → `ready_to_publish`; `false` → `rejected`
+- `POST /api/v1/youtube/publish` — public/schedule (bắt buộc đã duyệt CP6); `publish_at` → `scheduled`
+- `GET  /api/v1/youtube/publications/{id}` — trạng thái publication
+- Provider cắm qua `.env`: `YOUTUBE_PROVIDER` (mặc định `offline`, giả lập video id deterministic)
+
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.
 - `Idempotency-Key` giúp retry an toàn (job không chạy trùng).

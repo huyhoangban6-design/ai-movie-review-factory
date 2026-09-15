@@ -1,5 +1,6 @@
 from typing import Protocol
 
+from app.schemas.publishing import PublishOutput, UploadOutput
 from app.schemas.render import QAReportOutput, RenderOutput, SubtitleOutput
 from app.schemas.research import AnglesOutput, MovieResearchOutput, OpportunityScoreOutput
 from app.schemas.scripting import ScriptOutput, TimelineOutput, VoiceOutput
@@ -121,3 +122,27 @@ class QAProvider(Protocol):
     name: str = "offline"
 
     def run(self, script_id: int, context: dict) -> list[QAReportOutput]: ...
+
+
+# ---------- Phase 6: YouTube publishing ----------
+class PublishingProvider(Protocol):
+    name: str = "offline"
+
+    def upload(
+        self,
+        script_id: int,
+        title: str,
+        description: str | None,
+        tags: list[str],
+        render_url: str | None,
+        privacy: str,
+        notify_subscribers: bool,
+    ) -> UploadOutput: ...
+
+    def publish(
+        self,
+        youtube_video_id: str,
+        title: str,
+        privacy: str,
+        publish_at: object | None,
+    ) -> PublishOutput: ...

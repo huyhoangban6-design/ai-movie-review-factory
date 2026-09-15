@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.publishing import PublicationOut
 from app.schemas.render import QAReportOutput, RenderOutput, SubtitleOutput
 from app.schemas.research import Angle
 from app.schemas.visual import AssetOut, CopyrightReviewOutput, VisualPlanMetadata
@@ -196,3 +197,4 @@ class ScriptDetailOut(BaseModel):
     renders: list[VideoRenderOut] = Field(default_factory=list)
     subtitles: list[SubtitleOut] = Field(default_factory=list)
     qa_reports: list[QAReportOut] = Field(default_factory=list)
+    publications: list[PublicationOut] = Field(default_factory=list)

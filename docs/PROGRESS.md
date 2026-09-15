@@ -11,7 +11,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 3 | Script → voice → timestamps | ✅ Hoàn tất (commit `ce7b366`) |
 | 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit `ad904f0`) |
 | 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
-| 6 | YouTube private upload → approval → publish | ⬜ Chưa bắt đầu |
+| 6 | YouTube private upload → approval → publish | ✅ Hoàn tất (offline provider + 10 test, 58 total) |
 | 7 | Analytics → experiments → learning | ⬜ Chưa bắt đầu |
 | 8 | Cost engine + fallback + production hardening | ⬜ Chưa bắt đầu |
 
@@ -120,12 +120,41 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 - `job_type` subtitle dùng giá trị `subtitle` mới thêm vào enum `JobType` (không phải `qa`).
 - QA `script` gate không bắt buộc trong kết quả cuối; `QA_MANDATORY_GATES` khai báo nhưng kiểm tra dựa trên cờ `mandatory` từng gate.
 
-## Kiểm tra test thật (sandbox 2026-09-14)
+## Phase 6 — đã làm (YouTube private upload → approval → publish, CP6)
+- Model mới (migration `20260914_0006`): `publications` (script_id/render_id/project_id, status private_uploaded/ready_to_publish/scheduled/published/rejected/failed, youtube_video_id, title/description/tags, privacy_status, publish_at, published_url, approved/approval_note/approved_at, upload_metadata, error_message). `JobType` đã có sẵn `upload`/`publish`.
+- Provider layer Phase 6: `PublishingProvider` + `OfflinePublishingProvider` deterministic — video id = `offline-{hash11}`, watch URL, simulated upload_metadata; publish trả `published`/`scheduled` + publish_at.
+- API mới (auth + job lifecycle như Phase 5):
+  - `POST /youtube/upload` → preconditions 422: thiếu Final QA pass (gate `final`)/render chưa RENDERED/subtitle; tạo publication status `private_uploaded`, set `pipeline_status=upload`.
+  - `POST /youtube/approve` → CP6: approved=true → `ready_to_publish`, approved=false → `rejected`; không duyệt được publication đã published/scheduled (409).
+  - `POST /youtube/publish` → 422 nếu chưa duyệt; có `publish_at` → `scheduled`, không → `published`; set `pipeline_status=published`.
+  - `GET /youtube/publications/{id}` → trạng thái publication.
+  - `GET /scripts/{id}` mở rộng trả thêm `publications`.
+  - Preconditions đúng docs/13 + docs/00 #8: không bao giờ public nếu chưa Final QA + Human Approval.
+- Frontend `MovieDetailView`: 3 nút pipeline (Upload YouTube (private) → Duyệt/Từ chối (CP6) → Publish (public)) + hiển thị publications (status badge, youtube id, link xem video, ghi chú duyệt).
+- Tests (10 mới, tổng 58): `tests/test_phase6.py` — upload cần final QA (422), upload private success + publications trong script detail, title mặc định, approve ready_to_publish, reject, publish cần approval (422), publish public sau approval, schedule trong tương lai, ownership isolation 404, job upload succeeded.
+- Sửa bug nền để cả suite chạy được:
+  - `JobOut.project_id` thành nullable (jobs.project_id đã nullable từ Phase 5 mà schema bắt int).
+  - **Migration chain 0001→0006 giờ chạy được thật** (trước đây chưa từng kiểm tra): 
+    - `_now()` sinh cột không tên → đổi thành `"created_at"` (6 file migration, 24 bảng).
+    - `alter_column jobs.project_id` không tương thích SQLite → dùng `op.batch_alter_table` (0005).
+  - `mark_job_success` ở publish nhận `PublishOutput` (model) thay vì `dict` để `model_dump_json` serialize `datetime` (dòng-json báo lỗi).
+
+## Phase 6 — còn thiếu / lưu ý
+- Provider thật (YouTube Data API v3 — OAuth, upload video bytes, set thumbnail, check Content ID) chưa cắm: `YOUTUBE_PROVIDER=offline` giả lập (xem `.env.example`).
+- UI chỉ hỗ trợ approval đơn giản (note text); chưa có luồng "kiểm tra sau upload Private" (metadata/thumbnail/audio) như mô tả docs/13 — nằm ở provider thật.
+- Publication hiện gắn theo script (mỗi script có thể nhiều publication = các lần upload); chưa có "package" riêng cho thumbnail + SEO title/description ở Phase 6.
+- Scheduler đang giả lập ở mức trạng thái `scheduled`; worker auto-publish theo `publish_at` sẽ nối ở Phase 8.
+
+## Kiểm tra test thật (sandbox 2026-09-15)
 | Kiểm tra | Kết quả |
 |---|---|
-| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5) | ✅ 48 passed |
-| `tests/test_phase5.py` (render/subtitle/QA) | ✅ 10 passed |
-| Import toàn app `from app.main import app` + routes `/api/v1/video/*` | ✅ |
+| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5 + phase6) | ✅ 58 passed |
+| `tests/test_phase6.py` (YouTube upload/approve/publish) | ✅ 10 passed |
+| Import toàn app `from app.main import app` + routes `/api/v1/youtube/*` (4 routes) | ✅ |
+| `alembic upgrade head` trên SQLite mới (0001→0006) | ✅ Clean (đã sửa `_now()` cột created_at + batch_alter_column jobs) |
+| `alembic downgrade base` chạy ngược toàn bộ chain | ✅ Clean |
+| Frontend `npm test` (vitest format) | ✅ 3 passed (Node 20.18.3) |
+| Frontend `npm run build` (vite production) | ✅ Built (~192 KB js) |
 
 ## Kiểm tra static (Phase 4, sandbox 2026-09-14)
 | Kiểm tra | Kết quả |
@@ -144,10 +173,8 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | `CopyrightReviewOutput` field types consistent between providers, routers, detail response | ✅ |
 
 ## Chưa kiểm tra được (cần chạy local)
-- `pytest tests/test_phase4.py` — cần SQLite + sqlalchemy install
-- `alembic upgrade head` — cần PostgreSQL hoặc SQLite
-- `npm run build` — cần Node.js 20
-- Import toàn app (`from app.main import app`) — cần Python 3.12 + deps
+- Migrations trên PostgreSQL thật (đã kiểm tra SQLite; SQLite giờ chạy `upgrade head` và `downgrade base` sạch).
+- `pytest`/`npm test`/`npm run build` đã chạy được trong sandbox này (Python 3.12 + Node 20). Vẫn chưa test Docker Compose + Postgres + Redis.
 
 ## Lệnh cần chạy trên máy local
 ```bash
@@ -157,8 +184,8 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp ../.env.example ../.env           # chỉnh SECRET_KEY, DATABASE_URL nếu cần
 mkdir -p data                        # SQLite fallback
-alembic upgrade head                 # chạy migration 0001→0005
-pytest tests/ -v                     # 48 tests (auth → phase5)
+alembic upgrade head                 # chạy migration 0001→0006
+pytest tests/ -v                     # 58 tests (auth → phase6)
 
 # 2. Backend — chạy server kiểm tra API
 python run.py                        # http://localhost:8000/docs

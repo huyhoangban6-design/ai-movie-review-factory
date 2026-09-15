@@ -4,6 +4,7 @@ from app.services.providers import (
     OfflineAssetProvider,
     OfflineCopyrightProvider,
     OfflineOpportunityProvider,
+    OfflinePublishingProvider,
     OfflineQAProvider,
     OfflineRenderProvider,
     OfflineResearchProvider,
@@ -85,3 +86,9 @@ def get_qa_provider() -> OfflineQAProvider:
     if settings.qa_provider.lower() == "offline":
         return OfflineQAProvider()
     return OfflineQAProvider()
+
+
+def get_publishing_provider() -> OfflinePublishingProvider:
+    if settings.youtube_provider.lower() == "offline":
+        return OfflinePublishingProvider()
+    return OfflinePublishingProvider()

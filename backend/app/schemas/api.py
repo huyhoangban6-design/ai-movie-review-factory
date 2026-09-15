@@ -65,7 +65,7 @@ class JobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    project_id: int
+    project_id: int | None
     job_type: JobType
     status: JobStatus
     retry_count: int

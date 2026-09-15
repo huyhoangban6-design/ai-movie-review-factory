@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # Thư mục lưu output render (offline chỉ tạo URL placeholder).
     render_output_dir: str = "/data/render"
 
+    # ---- Phase 6: YouTube publishing providers ----
+    youtube_provider: str = "offline"
+    # Credential cho provider thật (YouTube Data API / OAuth) — bắt buộc đặt trong .env,
+    # tuyệt đối không hard-code client secret hoặc access token vào code.
+    youtube_client_id: str = ""
+    youtube_refresh_token: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

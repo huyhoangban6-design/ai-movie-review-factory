@@ -1,6 +1,8 @@
 import hashlib
 import re
+from datetime import datetime, timezone
 
+from app.schemas.publishing import PublishOutput, UploadOutput
 from app.schemas.render import (
     QACheckItem,
     QAReportOutput,
@@ -40,6 +42,7 @@ from app.services.base import (
     AssetProvider,
     CopyrightProvider,
     OpportunityProvider,
+    PublishingProvider,
     QAProvider,
     RenderProvider,
     ResearchProvider,
@@ -631,3 +634,56 @@ def _to_srt(cues: list[tuple[float, float, str]]) -> str:
         lines.append(text)
         lines.append("")
     return "\n".join(lines)
+
+
+# ---------- Phase 6: YouTube publishing ----------
+def _youtube_watch_url(video_id: str) -> str:
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
+class OfflinePublishingProvider(PublishingProvider):
+    name = "offline"
+
+    def upload(
+        self,
+        script_id: int,
+        title: str,
+        description: str | None,
+        tags: list[str],
+        render_url: str | None,
+        privacy: str,
+        notify_subscribers: bool,
+    ) -> UploadOutput:
+        # Deterministic video id cho pipeline test (thay bằng YouTube Data API ở provider thật).
+        digest = hashlib.sha256(f"{script_id}|{title}".encode()).hexdigest()[:11]
+        video_id = f"offline-{digest}"
+        return UploadOutput(
+            youtube_video_id=video_id,
+            privacy_status=privacy or "private",
+            video_url=_youtube_watch_url(video_id),
+            upload_metadata={
+                "provider": self.name,
+                "title": title,
+                "description": description,
+                "tags": tags,
+                "render_url": render_url,
+                "notify_subscribers": notify_subscribers,
+                "simulated": True,
+            },
+        )
+
+    def publish(
+        self,
+        youtube_video_id: str,
+        title: str,
+        privacy: str,
+        publish_at: object | None,
+    ) -> PublishOutput:
+        scheduled = publish_at is not None
+        return PublishOutput(
+            youtube_video_id=youtube_video_id,
+            privacy_status=privacy or "public",
+            status="scheduled" if scheduled else "published",
+            publish_at=publish_at if isinstance(publish_at, datetime) else None,
+            video_url=_youtube_watch_url(youtube_video_id),
+        )

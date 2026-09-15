@@ -10,11 +10,13 @@ from app.models.assets import Asset, CopyrightReview
 from app.models.job import Job, JobType
 from app.models.movie import ContentAngle, Movie
 from app.models.production import QAReport, Subtitle, VideoRender
+from app.models.publishing import Publication
 from app.models.scripting import Script, ScriptSegment, ScriptTimeline, VoiceGeneration
 from app.models.user import User
 from app.schemas.api import ScriptRequest, ScriptResult
 from app.schemas.scripting import (
     GenerationOut,
+    PublicationOut,
     QAReportOut,
     ScriptDetailOut,
     SegmentDetailOut,
@@ -169,6 +171,9 @@ def get_script_detail(
     qa_reports = list(
         db.scalars(select(QAReport).where(QAReport.script_id == script.id).order_by(QAReport.gate))
     )
+    publications = list(
+        db.scalars(select(Publication).where(Publication.script_id == script.id).order_by(Publication.id.desc()))
+    )
 
     if script.visual_plan:
         visual_plan = VisualPlanMetadata(
@@ -216,4 +221,7 @@ def get_script_detail(
         renders=[VideoRenderOut.model_validate(r, from_attributes=True) for r in renders],
         subtitles=[SubtitleOut.model_validate(s, from_attributes=True) for s in subtitles],
         qa_reports=[QAReportOut.model_validate(q, from_attributes=True) for q in qa_reports],
+        publications=[
+            PublicationOut.model_validate(p, from_attributes=True) for p in publications
+        ],
     )

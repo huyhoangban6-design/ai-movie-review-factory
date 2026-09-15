@@ -17,7 +17,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _now() -> sa.Column:
-    return sa.Column(sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False)
+    return sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False)
 
 
 def upgrade() -> None:
@@ -26,7 +26,9 @@ def upgrade() -> None:
     op.create_index(op.f("ix_projects_idempotency_key"), "projects", ["idempotency_key"], unique=True)
 
     # jobs: movie có thể chưa nằm trong project nào → project_id nullable.
-    op.alter_column("jobs", "project_id", existing_type=sa.Integer(), nullable=True)
+    # batch_alter_table để hỗ trợ SQLite (không có ALTER COLUMN native).
+    with op.batch_alter_table("jobs") as batch_op:
+        batch_op.alter_column("project_id", existing_type=sa.Integer(), nullable=True)
 
     # video_renders: FFmpeg render output (Phase 5)
     op.create_table(
@@ -132,4 +134,5 @@ def downgrade() -> None:
     op.drop_table("video_renders")
     op.drop_index(op.f("ix_projects_idempotency_key"), table_name="projects")
     op.drop_column("projects", "idempotency_key")
-    op.alter_column("jobs", "project_id", existing_type=sa.Integer(), nullable=False)
+    with op.batch_alter_table("jobs") as batch_op:
+        batch_op.alter_column("project_id", existing_type=sa.Integer(), nullable=False)

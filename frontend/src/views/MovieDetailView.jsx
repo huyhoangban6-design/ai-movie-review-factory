@@ -11,7 +11,7 @@ export default function MovieDetailView() {
   const [scriptDetail, setScriptDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false, visualPlan: false, assets: false, copyright: false, render: false, subtitle: false, qa: false })
+  const [busy, setBusy] = useState({ score: false, angles: false, script: false, voice: false, timeline: false, visualPlan: false, assets: false, copyright: false, render: false, subtitle: false, qa: false, upload: false, approve: false, publish: false })
 
   const load = useCallback(async () => {
     try {
@@ -163,6 +163,56 @@ export default function MovieDetailView() {
     finally { setBusy(b => ({ ...b, qa: false })) }
   }
 
+  async function onUpload() {
+    if (!scriptDetail) return
+    setBusy(b => ({ ...b, upload: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/youtube/upload', { method: 'POST', body: { script_id: scriptDetail.id } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, upload: false })) }
+  }
+
+  const latestPublication = scriptDetail?.publications?.[0]
+
+  async function onApprove() {
+    if (!latestPublication) return
+    setBusy(b => ({ ...b, approve: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/youtube/approve', { method: 'POST', body: { publication_id: latestPublication.id, approved: true, note: 'Duyệt bản nháp cuối (CP6).' } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, approve: false })) }
+  }
+
+  async function onReject() {
+    if (!latestPublication) return
+    setBusy(b => ({ ...b, approve: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/youtube/approve', { method: 'POST', body: { publication_id: latestPublication.id, approved: false, note: 'Từ chối ở checkpoint duyệt (CP6).' } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, approve: false })) }
+  }
+
+  async function onPublish() {
+    if (!latestPublication) return
+    setBusy(b => ({ ...b, publish: true }))
+    setError('')
+    try {
+      await apiFetch('/api/v1/youtube/publish', { method: 'POST', body: { publication_id: latestPublication.id, privacy: 'public' } })
+      await loadScript(scriptDetail.id)
+      await load()
+    } catch (err) { setError(err.message) }
+    finally { setBusy(b => ({ ...b, publish: false })) }
+  }
+
   if (loading) return <div className='muted'>Đang tải…</div>
   if (!movie) return <div className='error-banner'>{error || 'Không tìm thấy phim'}</div>
 
@@ -219,6 +269,18 @@ export default function MovieDetailView() {
           </button>
           <button className='btn btn-primary' disabled={busy.qa || !scriptDetail?.renders?.length || !scriptDetail?.subtitles?.length} onClick={onQA}>
             {busy.qa ? 'Đang QA…' : 'Chạy QA'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.upload || !scriptDetail?.qa_reports?.length} onClick={onUpload}>
+            {busy.upload ? 'Đang upload…' : latestPublication ? 'Upload lại (private)' : 'Upload YouTube (private)'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.approve || !latestPublication || latestPublication.status === 'published' || latestPublication.status === 'scheduled' || latestPublication.status === 'rejected'} onClick={onApprove}>
+            {busy.approve ? 'Đang xử lý…' : latestPublication?.status === 'ready_to_publish' ? 'Đã duyệt (CP6)' : 'Duyệt (CP6)'}
+          </button>
+          <button className='btn btn-primary' disabled={busy.approve || !latestPublication || latestPublication.status !== 'private_uploaded'} onClick={onReject}>
+            Từ chối
+          </button>
+          <button className='btn btn-primary' disabled={busy.publish || !latestPublication || latestPublication.status !== 'ready_to_publish'} onClick={onPublish}>
+            {busy.publish ? 'Đang publish…' : 'Publish (public)'}
           </button>
         </div>
         {error && <div className='error-banner' style={{ marginTop: '0.5rem' }}>{error}</div>}
@@ -405,6 +467,29 @@ export default function MovieDetailView() {
                     <span className={`badge badge-small ${rep.passed ? '' : 'error-banner'}`}>{rep.passed ? 'PASS' : 'FAIL'}</span>
                     <span className='strong'>{rep.gate}</span>
                     {rep.severity !== 'pass' && <span className='muted small'>· {rep.severity}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {scriptDetail.publications?.length > 0 && (
+            <div className='publishing-info'>
+              <h3>Xuất bản YouTube ({scriptDetail.publications.length})</h3>
+              <ul className='timeline-list'>
+                {scriptDetail.publications.map((pub) => (
+                  <li key={pub.id} className='timeline-item'>
+                    <span className={`badge badge-small ${pub.status === 'published' ? '' : pub.status === 'rejected' ? 'error-banner' : 'badge-pending'}`}>{pub.status.replace(/_/g, ' ')}</span>
+                    <span className='strong'>{pub.title}</span>
+                    <span className='muted small' style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                      {pub.youtube_video_id}
+                    </span>
+                    <div className='muted small' style={{ width: '100%' }}>
+                      {pub.privacy_status}{pub.publish_at ? ` · lên sóng ${formatDate(pub.publish_at)}` : ''}{pub.approved ? ' · đã duyệt' : ''}
+                      {pub.published_url ? (<span> · <a href={pub.published_url} target='_blank' rel='noreferrer'>xem video</a></span>) : ''}
+                      {pub.approval_note ? <span> · {pub.approval_note}</span> : ''}
+                      {pub.error_message ? <span className='error-banner'> · {pub.error_message}</span> : ''}
+                    </div>
                   </li>
                 ))}
               </ul>
