@@ -12,6 +12,7 @@ from app.models.user import User
 from app.schemas.api import ScoreRequest, ScoreResult
 from app.services.factory import get_opportunity_provider
 from app.services.jobs import create_job, mark_job_failed, mark_job_success, next_attempt_key
+from app.services.strategy import get_active_strategy
 
 router = APIRouter(prefix="/opportunities", tags=["opportunity"])
 
@@ -42,7 +43,8 @@ def score_movie(
     )
 
     try:
-        provider = get_opportunity_provider()
+        strategy_version, weights, _source, _exp_id = get_active_strategy(db)
+        provider = get_opportunity_provider(weights=weights)
         score = provider.score(movie)
     except Exception as e:  # noqa: BLE001
         mark_job_failed(db, job, str(e))
@@ -58,6 +60,7 @@ def score_movie(
     opp.sub_scores = data
     opp.confidence = data["confidence"]
     opp.rationale = data["rationale"]
+    opp.strategy_version = strategy_version
     db.flush()
     opp_id = opp.id
 

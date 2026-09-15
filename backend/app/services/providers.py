@@ -1,7 +1,14 @@
 import hashlib
+import math
 import re
 from datetime import datetime, timezone
 
+from app.schemas.analytics import (
+    InsightOutput,
+    LearnProviderOutput,
+    ProposedStrategy,
+    VideoMetricsOutput,
+)
 from app.schemas.publishing import PublishOutput, UploadOutput
 from app.schemas.render import (
     QACheckItem,
@@ -37,6 +44,7 @@ from app.schemas.visual import (
     VisualPlanSegment,
 )
 from app.services.base import (
+    AnalyticsProvider,
     AngleProvider,
     AssetLike,
     AssetProvider,
@@ -68,22 +76,45 @@ WEIGHTS = {
 }
 
 
-def weighted_opportunity_score(s: OpportunityScoreOutput) -> float:
+def weighted_opportunity_score(
+    s: OpportunityScoreOutput, weights: dict | None = None
+) -> float:
+    w = weights or WEIGHTS
     return round(
         max(
             0.0,
             min(
                 100.0,
-                s.demand * WEIGHTS["demand"]
-                + s.trend * WEIGHTS["trend"]
-                + s.audience_fit * WEIGHTS["audience_fit"]
-                + s.evergreen * WEIGHTS["evergreen"]
-                + s.competition * WEIGHTS["competition"]
-                + s.difficulty * WEIGHTS["difficulty"],
+                s.demand * w.get("demand", WEIGHTS["demand"])
+                + s.trend * w.get("trend", WEIGHTS["trend"])
+                + s.audience_fit * w.get("audience_fit", WEIGHTS["audience_fit"])
+                + s.evergreen * w.get("evergreen", WEIGHTS["evergreen"])
+                + s.competition * w.get("competition", WEIGHTS["competition"])
+                + s.difficulty * w.get("difficulty", WEIGHTS["difficulty"]),
             ),
         ),
         1,
     )
+
+
+WEIGHT_KEYS = ["demand", "trend", "audience_fit", "evergreen", "competition", "difficulty"]
+
+
+def normalize_weights(
+    weights: dict, default: dict | None = None
+) -> dict[str, float]:
+    """Làm đầy đủ 6 khóa từ default, clamp >= 0 và chuẩn hoá tổng = 1.0.
+
+    Pure function cho strategy từ analytics/experiment (Phase 7).
+    """
+    base = dict(default or WEIGHTS)
+    for key in WEIGHT_KEYS:
+        val = float(weights.get(key, base.get(key, 0.0)))
+        base[key] = val if val > 0.0 else 0.0
+    total = sum(base.values())
+    if total <= 0.0:
+        return {k: round(v, 4) for k, v in base.items()}
+    return {k: round(v / total, 4) for k, v in base.items()}
 
 
 class OfflineResearchProvider(ResearchProvider):
@@ -113,6 +144,10 @@ class OfflineResearchProvider(ResearchProvider):
 class OfflineOpportunityProvider(OpportunityProvider):
     name = "offline"
 
+    def __init__(self, weights: dict | None = None) -> None:
+        # Trọng số có thể tới từ active experiment (Phase 7 learning loop).
+        self._weights = normalize_weights(weights) if weights else None
+
     def score(self, movie: object) -> OpportunityScoreOutput:
         year = getattr(movie, "year", None)
         demand = 55.0 if year is not None and year >= 2015 else 48.0
@@ -132,7 +167,7 @@ class OfflineOpportunityProvider(OpportunityProvider):
             confidence=0.5,
             rationale="(offline) Điểm mẫu heuristic. Cần provider thật để có confidence cao.",
         )
-        s.overall = weighted_opportunity_score(s)
+        s.overall = weighted_opportunity_score(s, self._weights)
         return s
 
 
@@ -686,4 +721,230 @@ class OfflinePublishingProvider(PublishingProvider):
             status="scheduled" if scheduled else "published",
             publish_at=publish_at if isinstance(publish_at, datetime) else None,
             video_url=_youtube_watch_url(youtube_video_id),
+        )
+
+
+# ---------- Phase 7: analytics / experiments / learning ----------
+def _seed_from(text: str) -> int:
+    return int(hashlib.sha256(text.encode()).hexdigest()[:16], 16)
+
+
+def _lcg(seed: int, n: int) -> float:
+    """LCG deterministic 0..1: cùng (seed, n) luôn cho cùng giá trị."""
+    val = seed
+    for _ in range(n):
+        val = (val * 1103515245 + 12345) % (2**31)
+    return val / (2**31)
+
+
+class OfflineAnalyticsProvider(AnalyticsProvider):
+    name = "offline"
+
+    def fetch_metrics(
+        self,
+        publication_id: int,
+        video_id: str,
+        title: str,
+        duration_s: float | None,
+        captured_at: object | None,
+    ) -> VideoMetricsOutput:
+        # Deterministic theo (video_id, title, publication): cùng input → cùng metrics.
+        seed = _seed_from(f"{video_id}|{title}|{publication_id}")
+        views = int(200 + _lcg(seed, 1) * 12_000)
+        impressions = int(views * (7 + _lcg(seed, 2) * 20))
+        clicks = int(impressions * (0.02 + _lcg(seed, 3) * 0.05))
+        ctr_pct = round(clicks / impressions * 100, 2) if impressions else 0.0
+        likes = int(views * (0.012 + _lcg(seed, 4) * 0.04))
+        comments = int(likes * (0.04 + _lcg(seed, 5) * 0.2))
+
+        dur = duration_s if duration_s and duration_s > 0 else 300.0
+        avg_view_duration_s = round(min(dur, max(15.0, dur * (0.22 + _lcg(seed, 6) * 0.38))), 1)
+        watch_time_hours = round(views * avg_view_duration_s / 3600, 2)
+        retention_avg_pct = round(20 + _lcg(seed, 7) * 40, 1)
+
+        top = 92 + _lcg(seed, 10) * 4
+        curve: list[float] = []
+        for i in range(12):
+            t = i / 11
+            val = top - (top - retention_avg_pct) * t + (_lcg(seed, 20 + i) - 0.5) * 3
+            curve.append(round(max(0.0, min(100.0, val)), 1))
+        curve[-1] = retention_avg_pct
+
+        parts = {
+            "search": 30 + _lcg(seed, 11) * 14,
+            "suggested": 22 + _lcg(seed, 12) * 10,
+            "browse": 12 + _lcg(seed, 13) * 8,
+            "external": 6 + _lcg(seed, 14) * 6,
+            "shorts_other": 4 + _lcg(seed, 15) * 10,
+        }
+        total = sum(parts.values())
+        traffic_sources = {k: round(v / total * 100, 1) for k, v in parts.items()}
+
+        subscribers_gained = int(views * (0.0012 + _lcg(seed, 16) * 0.004))
+        rpm_usd = round(1.0 + _lcg(seed, 17) * 3.2, 2)
+        revenue_usd = round(views / 1000 * rpm_usd, 2)
+
+        return VideoMetricsOutput(
+            video_id=video_id,
+            captured_at=captured_at if isinstance(captured_at, datetime) else None,
+            views=views,
+            impressions=impressions,
+            clicks=clicks,
+            ctr_pct=ctr_pct,
+            likes=likes,
+            comments=comments,
+            watch_time_hours=watch_time_hours,
+            avg_view_duration_s=avg_view_duration_s,
+            retention_avg_pct=retention_avg_pct,
+            retention_curve=curve,
+            traffic_sources=traffic_sources,
+            subscribers_gained=subscribers_gained,
+            revenue_usd=revenue_usd,
+            rpm_usd=rpm_usd,
+            imported_from="offline",
+            simulated=True,
+            metadata={
+                "provider": "offline",
+                "publication_id": publication_id,
+                "title": title,
+                "duration_s": dur,
+                "simulated": True,
+            },
+        )
+
+    def research_competitors(
+        self, movie_id: int, movie_title: str, year: int | None
+    ) -> list[dict]:
+        channels = [
+            ("Cine Reviews VN", "review", 8),
+            ("Điện Ảnh 24H", "news", 6),
+            ("MovieFactory Lab", "analysis", 5),
+            ("ReelTalk", "breakdown", 4),
+        ]
+        out: list[dict] = []
+        for channel, genre, influence in channels:
+            seed = _seed_from(f"{movie_title}|{channel}")
+            view_count = int(30_000 + _lcg(seed, 1) * 1_000_000)
+            videos = [
+                {
+                    "movie_title": movie_title,
+                    "score": int(3 + _lcg(seed, 2) * 6),
+                    "influence": influence,
+                    "view_count": view_count,
+                    "retrieval_url": f"https://www.youtube.com/results?search_query={movie_title.replace(' ', '+')}+review",
+                }
+            ]
+            top_videos = [
+                f"{movie_title} — {phrase}"
+                for phrase in ("Review nhanh", "Phân tích chuyên sâu", "Vì sao nó hay")
+            ]
+            out.append(
+                {
+                    "channel": channel,
+                    "genre": genre,
+                    "influence": influence,
+                    "top_videos": top_videos,
+                    "videos": videos,
+                }
+            )
+        return out
+
+    def derive_insights(
+        self, videos: list[VideoMetricsOutput], scope: str
+    ) -> LearnProviderOutput:
+        if not videos:
+            return LearnProviderOutput(
+                insights=[
+                    InsightOutput(
+                        scope=scope,
+                        category="data",
+                        insight="Chưa có đủ metrics để học. Hãy refresh metrics của video đã xuất bản.",
+                        suggestion="POST /analytics/video/{publication_id}/refresh sau khi publish.",
+                    )
+                ],
+                proposed_strategy=ProposedStrategy(
+                    strategy_version="v2",
+                    weights=normalize_weights({}),
+                    rationale="(offline) Đề xuất v2 dựa trên baseline; chưa có dữ liệu để calibrate.",
+                ),
+            )
+
+        n = len(videos)
+        avg_ctr = sum(v.ctr_pct for v in videos) / n
+        avg_retention = sum(v.retention_avg_pct for v in videos) / n
+        avg_view_dur = sum(v.avg_view_duration_s for v in videos) / n
+        total_watch = sum(v.watch_time_hours for v in videos)
+        total_views = sum(v.views for v in videos)
+
+        insights: list[InsightOutput] = []
+        if avg_ctr < 3.5:
+            insights.append(
+                InsightOutput(
+                    scope=scope,
+                    category="ctr",
+                    insight=f"CTR trung bình {avg_ctr:.2f}% — thấp hơn ngưỡng 3.5%.",
+                    suggestion="Thử hook/list angle + thumbnail rõ ràng để tăng click (docs/13).",
+                    signal_value=avg_ctr,
+                    strategy_version="v1",
+                )
+            )
+        if avg_retention < 30:
+            insights.append(
+                InsightOutput(
+                    scope=scope,
+                    category="retention",
+                    insight=f"Retention trung bình {avg_retention:.1f}% — khán giả rời sớm.",
+                    suggestion="Rút gọn analysis/evidence, đưa hook và thesis lên đầu để giữ chân (docs/05 Script Agent).",
+                    signal_value=avg_retention,
+                    strategy_version="v1",
+                )
+            )
+        if avg_view_dur / 60 > 12:
+            insights.append(
+                InsightOutput(
+                    scope=scope,
+                    category="watch_time",
+                    insight=f"Độ dài xem trung bình {avg_view_dur / 60:.1f} phút — video khá dài.",
+                    suggestion="Cân nhắc tách phần nội dung dài thành video ngắn hơn hoặc chuỗi.",
+                    signal_value=avg_view_dur,
+                    strategy_version="v1",
+                )
+            )
+        if not insights and avg_ctr >= 5.0:
+            insights.append(
+                InsightOutput(
+                    scope=scope,
+                    category="ctr",
+                    insight=f"CTR trung bình {avg_ctr:.2f}% — hook/thumbnail đang hiệu quả.",
+                    suggestion="Giữ nguyên phong cách hook và nhân rộng góc nội dung tương tự.",
+                    signal_value=avg_ctr,
+                    strategy_version="v1",
+                )
+            )
+
+        # Calibrate lại trọng số scoring (docs/13: metrics → strategy version).
+        proposed = dict(WEIGHTS)
+        if avg_ctr >= 5.0:
+            proposed["trend"] += 0.04
+            proposed["demand"] += 0.02
+        elif avg_ctr < 3.0:
+            proposed["competition"] -= 0.03
+            proposed["audience_fit"] += 0.03
+        if avg_retention >= 45:
+            proposed["audience_fit"] += 0.03
+            proposed["evergreen"] += 0.02
+        elif avg_retention < 25:
+            proposed["evergreen"] += 0.05
+            proposed["difficulty"] -= 0.02
+
+        return LearnProviderOutput(
+            insights=insights,
+            proposed_strategy=ProposedStrategy(
+                strategy_version="v2",
+                weights=normalize_weights(proposed),
+                rationale=(
+                    f"(offline) Calibrate từ {n} video: CTR {avg_ctr:.2f}%, retention {avg_retention:.1f}%, "
+                    f"watch {total_watch:.1f}h cho {total_views:,} views."
+                ),
+            ),
         )

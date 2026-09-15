@@ -1,5 +1,6 @@
 from typing import Protocol
 
+from app.schemas.analytics import LearnProviderOutput, VideoMetricsOutput
 from app.schemas.publishing import PublishOutput, UploadOutput
 from app.schemas.render import QAReportOutput, RenderOutput, SubtitleOutput
 from app.schemas.research import AnglesOutput, MovieResearchOutput, OpportunityScoreOutput
@@ -146,3 +147,25 @@ class PublishingProvider(Protocol):
         privacy: str,
         publish_at: object | None,
     ) -> PublishOutput: ...
+
+
+# ---------- Phase 7: analytics / experiments / learning ----------
+class AnalyticsProvider(Protocol):
+    name: str = "offline"
+
+    def fetch_metrics(
+        self,
+        publication_id: int,
+        video_id: str,
+        title: str,
+        duration_s: float | None,
+        captured_at: object | None,
+    ) -> VideoMetricsOutput: ...
+
+    def research_competitors(
+        self, movie_id: int, movie_title: str, year: int | None
+    ) -> list[dict]: ...
+
+    def derive_insights(
+        self, videos: list[VideoMetricsOutput], scope: str
+    ) -> LearnProviderOutput: ...

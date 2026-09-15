@@ -12,7 +12,7 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
 | 4 | Visual plan → assets → copyright gate | ✅ Hoàn tất (commit `ad904f0`) |
 | 5 | FFmpeg render → subtitle → QA | ✅ Hoàn tất (offline providers + full test, sandbox 2026-09-14) |
 | 6 | YouTube private upload → approval → publish | ✅ Hoàn tất (commit `0c161f3`) |
-| 7 | Analytics → experiments → learning | ⬜ Chưa bắt đầu |
+| 7 | Analytics → experiments → learning | ✅ Hoàn tất |
 | 8 | Cost engine + fallback + production hardening | ⬜ Chưa bắt đầu |
 
 ## Phase 1 — đã làm
@@ -139,21 +139,45 @@ Nhật ký trạng thái dự án AI Movie Review Factory. Cập nhật sau mỗ
     - `alter_column jobs.project_id` không tương thích SQLite → dùng `op.batch_alter_table` (0005).
   - `mark_job_success` ở publish nhận `PublishOutput` (model) thay vì `dict` để `model_dump_json` serialize `datetime` (dòng-json báo lỗi).
 
+## Phase 7 — đã làm (Analytics → experiments → learning, vòng học hỏi docs/13)
+- Models mới (migration `20260914_0007`): `youtube_metrics` (publication/owner/video_id, views/impressions/clicks/ctr_pct, likes/comments, watch_time_hours/avg_view_duration_s, retention_avg_pct/retention_curve (12 điểm), traffic_sources, subscribers_gained, revenue_usd/rpm_usd, imported_from/data), `analytics_insights` (scope/category/insight/suggestion/signal_value/strategy_version/status), `experiments` (strategy_version/weights/status proposed|active|archived/stage/activated_at), `kpi_snapshots` (tổng KPI kênh mỗi lần refresh). `JobType` mới: `analytics`, `competitor_research`, `learn` (enum string — không cần migration jobs).
+- Provider layer Phase 7: `AnalyticsProvider` protocol + `OfflineAnalyticsProvider` deterministic (LCG `_seed_from`/`_lcg` theo video_id|title|publication — cùng input → cùng metrics; CTR = clicks/impressions*100, retention curve, traffic sources, RPM/revenue); `research_competitors(movie)` 4 kênh tham chiếu deterministic; `derive_insights(videos)` → insights (ctr <3.5 / retention <30 / watch time >12 phút → suggestion hook, script, độ dài) + đề xuất `strategy_version=v2` calibrate lại WEIGHTS.
+- Calibration trọng số (docs/13 learning loop metrics → strategy): `weighted_opportunity_score(s, weights=None)` tham số hoá, `normalize_weights()` (điền đủ 6 khóa từ default, clamp ≥0, tổng = 1.0), `OfflineOpportunityProvider(weights=None)`, `services/strategy.py` `get_active_strategy(db)` ưu tiên experiment active mới nhất, chưa có → v1 mặc định. `POST /opportunities/score` giờ dùng trọng số đang áp dụng + ghi `opportunity.strategy_version` (migration thêm cột strategy_version cho opportunities từ 0002). Không có circular import (WEIGHT_KEYS/normalize_weights nằm trong providers.py).
+- API mới (auth + job lifecycle):
+  - `POST /analytics/video/{publication_id}/refresh` → 422 nếu chưa upload hoặc publication rejected/failed; job `analytics`; lưu snapshot + kpi_snapshot; response `VideoMetricsResult`.
+  - `GET /analytics/video/{publication_id}` → snapshot `stored` gần nhất; không có → tính `derived` read-only (không ghi DB).
+  - `GET /analytics/video/{publication_id}/history`, `GET /analytics/summary` (KPI tổng kênh, chỉ metrics của owner).
+  - `POST /analytics/competitors/research` (job `competitor_research`, replace theo movie) + `GET /analytics/competitors?movie_id=` (dựng sẵn bảng competitors/competitor_videos từ Phase 2 — giờ mới được populate).
+  - `POST /analytics/learn` (job `learn`): ghi analytics_insights + tạo Experiment `proposed`/`analytics_calibration`.
+  - `GET /analytics/insights`, `GET /analytics/strategy`, `GET/POST /analytics/experiments`, `POST /analytics/experiments/{id}/activate` (archive các active khác; idempotent).
+  - Ownership isolation: mọi query lọc owner → 404 cho user khác.
+- Frontend: `AnalyticsSection.jsx` trong `MovieDetailView` — Kéo metrics / Nghiên cứu đối thủ / Chạy học hỏi, metric cards (views/likes/comments/CTR/retention/watch-time/revenue/RPM), traffic sources, strategy weights bars + source experiment/default, experiment list + nút Kích hoạt, insights, đối thủ. `format.js` có thêm `formatNumber`, `formatPercent`, nhãn job analytics/competitor_research/learn.
+- Tests (13 mới, tổng 71): `tests/test_phase7.py` — refresh tạo metric+job, deterministic & history replace, GET stored/derived, refresh rejected 422, ownership 404 (metrics/research/experiments), competitor research replace + list, learning loop tạo insights + experiment v2, learn không có metrics → insight "data", summary chỉ owner, strategy v1 default, experiment tạo/activate đổi scoring theo đúng trọng số đã normalize, experiment thiếu weights 422 + ownership 404.
+- Migration checks: `alembic upgrade head` 0001→0007 trên SQLite mới + `downgrade base` + `upgrade head` lại — đều sạch.
+- Đổi tên cột `metadata` → `data` trong model/migration (collide với SQLAlchemy declarative reserved).
+
 ## Phase 6 — còn thiếu / lưu ý
 - Provider thật (YouTube Data API v3 — OAuth, upload video bytes, set thumbnail, check Content ID) chưa cắm: `YOUTUBE_PROVIDER=offline` giả lập (xem `.env.example`).
 - UI chỉ hỗ trợ approval đơn giản (note text); chưa có luồng "kiểm tra sau upload Private" (metadata/thumbnail/audio) như mô tả docs/13 — nằm ở provider thật.
 - Publication hiện gắn theo script (mỗi script có thể nhiều publication = các lần upload); chưa có "package" riêng cho thumbnail + SEO title/description ở Phase 6.
 - Scheduler đang giả lập ở mức trạng thái `scheduled`; worker auto-publish theo `publish_at` sẽ nối ở Phase 8.
 
+## Phase 7 — còn thiếu / lưu ý
+- Provider thật (YouTube Analytics Data API) chưa cắm: `ANALYTICS_PROVIDER=offline` deterministic cho test; real provider cần reuse OAuth `youtube_*` creds (xem `.env.example`) + lịch kéo metrics.
+- Insight hiện chỉ có scope `global` (aggregate theo owner); scope per-movie cho chiến dịch cụ thể + tích hợp feedback vào Script/Angle Provider (docs/13 "opportunity/angle/script/hook library updates") để Phase sau.
+- Experiment hiện calibrate trọng số opp scoring; chưa có A/B trên thumbnail/title/CTA thật — cần provider thật + phân phối traffic.
+- `GET /analytics/video/{id}` với video chưa có snapshot trả `derived` (ước tính, không lưu); có thể bổ sung nút "mark as imported" khi import số liệu thật.
+- KPI snapshot chỉ ghi khi refresh; chưa có lịch biểu (cron) tự động snapshot theo tuần — để Phase 8 cùng worker/queue.
+
 ## Kiểm tra test thật (sandbox 2026-09-15)
 | Kiểm tra | Kết quả |
 |---|---|
-| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5 + phase6) | ✅ 58 passed |
-| `tests/test_phase6.py` (YouTube upload/approve/publish) | ✅ 10 passed |
-| Import toàn app `from app.main import app` + routes `/api/v1/youtube/*` (4 routes) | ✅ |
-| `alembic upgrade head` trên SQLite mới (0001→0006) | ✅ Clean (đã sửa `_now()` cột created_at + batch_alter_column jobs) |
-| `alembic downgrade base` chạy ngược toàn bộ chain | ✅ Clean |
-| Frontend `npm test` (vitest format) | ✅ 3 passed (Node 20.18.3) |
+| Backend pytest toàn bộ `tests/` (auth + projects + phase2 + phase3 + phase4 + phase5 + phase6 + phase7) | ✅ 71 passed |
+| `tests/test_phase7.py` (analytics/metrics/experiments/learning) | ✅ 13 passed |
+| Import toàn app `from app.main import app` + routes `/api/v1/analytics/*` (12 routes) | ✅ |
+| `alembic upgrade head` trên SQLite mới (0001→0007) | ✅ Clean (cột `data` thay `metadata` do reserved) |
+| `alembic downgrade base` + `upgrade head` lại (0007) | ✅ Clean |
+| Frontend `npm test` (vitest format) | ✅ 5 passed (Node 20.18.3) |
 | Frontend `npm run build` (vite production) | ✅ Built (~192 KB js) |
 
 ## Kiểm tra static (Phase 4, sandbox 2026-09-14)

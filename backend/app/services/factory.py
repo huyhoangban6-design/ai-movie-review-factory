@@ -1,5 +1,6 @@
 from app.core.config import settings
 from app.services.providers import (
+    OfflineAnalyticsProvider,
     OfflineAngleProvider,
     OfflineAssetProvider,
     OfflineCopyrightProvider,
@@ -22,10 +23,10 @@ def get_research_provider() -> OfflineResearchProvider:
     return OfflineResearchProvider()
 
 
-def get_opportunity_provider() -> OfflineOpportunityProvider:
+def get_opportunity_provider(weights: dict | None = None) -> OfflineOpportunityProvider:
     if settings.opportunity_provider.lower() == "offline":
-        return OfflineOpportunityProvider()
-    return OfflineOpportunityProvider()
+        return OfflineOpportunityProvider(weights=weights)
+    return OfflineOpportunityProvider(weights=weights)
 
 
 def get_angle_provider() -> OfflineAngleProvider:
@@ -92,3 +93,9 @@ def get_publishing_provider() -> OfflinePublishingProvider:
     if settings.youtube_provider.lower() == "offline":
         return OfflinePublishingProvider()
     return OfflinePublishingProvider()
+
+
+def get_analytics_provider() -> OfflineAnalyticsProvider:
+    if settings.analytics_provider.lower() == "offline":
+        return OfflineAnalyticsProvider()
+    return OfflineAnalyticsProvider()

@@ -1,3 +1,4 @@
+from app.models.analytics import AnalyticsInsight, Experiment, KPISnapshot, YouTubeMetric
 from app.models.base import Base
 from app.models.assets import Asset, AssetSource, CopyrightReview, RiskLevel
 from app.models.job import Job
@@ -28,6 +29,7 @@ from app.models.scripting import (
 from app.models.user import User
 
 __all__ = [
+    "AnalyticsInsight",
     "Asset",
     "AssetSource",
     "Base",
@@ -36,7 +38,9 @@ __all__ = [
     "CompetitorVideo",
     "ContentAngle",
     "CopyrightReview",
+    "Experiment",
     "Job",
+    "KPISnapshot",
     "MediaSource",
     "Movie",
     "MovieAnalysis",
@@ -61,4 +65,5 @@ __all__ = [
     "VoiceProfile",
     "VoiceProvider",
     "VoiceRouteTier",
+    "YouTubeMetric",
 ]

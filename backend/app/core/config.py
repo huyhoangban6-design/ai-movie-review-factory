@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     youtube_client_id: str = ""
     youtube_refresh_token: str = ""
 
+    # ---- Phase 7: analytics / experiments / learning providers ----
+    analytics_provider: str = "offline"
+    # Provider thật (YouTube Analytics API) sẽ dùng chung credential YouTube ở trên.
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -23,6 +23,10 @@ class JobType(str, enum.Enum):
     QA = "qa"
     UPLOAD = "upload"
     PUBLISH = "publish"
+    # ---------- Phase 7: analytics / experiments / learning ----------
+    ANALYTICS = "analytics"
+    COMPETITOR_RESEARCH = "competitor_research"
+    LEARN = "learn"
 
 
 class JobStatus(str, enum.Enum):

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.angles import router as angles_router
+from app.api.analytics import router as analytics_router
 from app.api.assets import router as assets_router
 from app.api.auth import router as auth_router
 from app.api.copyright import router as copyright_router
@@ -67,6 +68,7 @@ app.include_router(assets_router, prefix=settings.api_v1_prefix)
 app.include_router(copyright_router, prefix=settings.api_v1_prefix)
 app.include_router(video_router, prefix=settings.api_v1_prefix)
 app.include_router(youtube_router, prefix=settings.api_v1_prefix)
+app.include_router(analytics_router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/health", tags=["system"])

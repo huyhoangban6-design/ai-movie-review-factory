@@ -84,6 +84,19 @@ cd frontend && npm test                                  # frontend (vitest)
 - `GET  /api/v1/youtube/publications/{id}` — trạng thái publication
 - Provider cắm qua `.env`: `YOUTUBE_PROVIDER` (mặc định `offline`, giả lập video id deterministic)
 
+## API (Phase 7 — analytics, experiments, learning)
+- `POST /api/v1/analytics/video/{publication_id}/refresh` — kéo metrics video (precondition: đã upload + chưa rejected/failed)
+- `GET  /api/v1/analytics/video/{publication_id}` — metrics mới nhất (snapshot `stored`, chưa có → `derived`)
+- `GET  /api/v1/analytics/video/{publication_id}/history` — lịch sử snapshot metrics
+- `GET  /api/v1/analytics/summary` — tổng KPI kênh (views/CTR/watch time/revenue)
+- `POST /api/v1/analytics/competitors/research` — nghiên cứu đối thủ/reference video (replace theo movie)
+- `GET  /api/v1/analytics/competitors?movie_id=` — danh sách đối thủ của movie
+- `POST /api/v1/analytics/learn` — learning loop: metrics → insights → đề xuất strategy v2 (experiment)
+- `GET  /api/v1/analytics/insights` — danh sách insights
+- `GET  /api/v1/analytics/strategy` — chiến lược đang áp dụng (experiment active hoặc v1 mặc định)
+- `GET/POST /api/v1/analytics/experiments` + `POST /api/v1/analytics/experiments/{id}/activate` — calibrate trọng số, kích hoạt cho scoring
+- Provider cắm qua `.env`: `ANALYTICS_PROVIDER` (mặc định `offline`, deterministic sample)
+
 ## Nguyên tắc bảo mật
 - Không commit secrets. Tạo `SECRET_KEY` mạnh khi deploy.
 - `Idempotency-Key` giúp retry an toàn (job không chạy trùng).

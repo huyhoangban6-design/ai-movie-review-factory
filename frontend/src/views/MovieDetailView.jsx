@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { apiFetch } from '../api'
 import { formatDate, formatDuration, SCRIPT_SECTION_LABEL } from '../format'
+import AnalyticsSection from './AnalyticsSection'
 
 const SCORE_WEIGHTS = { demand: 0.25, trend: 0.20, audience_fit: 0.15, evergreen: 0.15, competition: 0.15, difficulty: 0.10 }
 
@@ -497,6 +498,8 @@ export default function MovieDetailView() {
           )}
         </section>
       )}
+
+      <AnalyticsSection movieId={movie.id} publicationId={latestPublication?.id ?? null} />
     </div>
   )
 }

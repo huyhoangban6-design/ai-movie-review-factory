@@ -18,6 +18,19 @@ export function formatDuration(seconds) {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`
 }
 
+export function formatNumber(value) {
+  if (value == null || Number.isNaN(value)) return '—'
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (abs >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+  return String(Math.round(value))
+}
+
+export function formatPercent(value) {
+  if (value == null || Number.isNaN(value)) return '—'
+  return `${value.toFixed(1)}%`
+}
+
 export const SCRIPT_SECTION_LABEL = {
   hook: 'Hook (mở hấp dẫn)',
   thesis: 'Luận điểm chính',
@@ -51,4 +64,7 @@ export const JOB_TYPE_LABEL = {
   qa: 'QA',
   upload: 'Upload',
   publish: 'Xuất bản',
+  analytics: 'Analytics',
+  competitor_research: 'Nghiên cứu đối thủ',
+  learn: 'Học hỏi',
 }
